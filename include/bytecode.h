@@ -24,7 +24,8 @@ typedef enum {
   OP_ConstructorName,
   OP_Phi,
   OP_MakeLambda,
-  OP_GetIndex
+  OP_GetIndex,
+  OP_Special
 } Opcode;
 
 typedef struct {

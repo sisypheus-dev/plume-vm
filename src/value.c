@@ -18,6 +18,17 @@ char* type_of(Value v) {
   }
 }
 
+char* constructor_name(Value v) {
+  ASSERT(v.type == VALUE_LIST, "Cannot get constructor name of non-list value");
+  ASSERT(v.list_value.length > 0, "Cannot get constructor name of empty value");
+  ASSERT(v.list_value.values[0].type == VALUE_SPECIAL,
+         "Cannot get constructor name of non-type value");
+  ASSERT(v.list_value.values[1].type == VALUE_STRING,
+         "Constructor name must be a string");
+
+  return v.list_value.values[1].string_value;
+}
+
 Value equal(Value x, Value y) {
   ASSERT(x.type == y.type, "Cannot compare values of different types");
 
@@ -39,6 +50,9 @@ Value equal(Value x, Value y) {
         }
       }
 
+      return MAKE_INTEGER(1);
+    }
+    case VALUE_SPECIAL: {
       return MAKE_INTEGER(1);
     }
     default:

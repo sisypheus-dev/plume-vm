@@ -19,6 +19,9 @@ void native_print(Value value) {
     case VALUE_INT:
       printf("%lld", value.int_value);
       break;
+    case VALUE_SPECIAL:
+      printf("<special>");
+      break;
     case VALUE_FLOAT:
       printf("%f", value.float_value);
       break;
@@ -60,7 +63,7 @@ void print_frame(Frame fr) {
 
 void execute(Module* module, Instruction instr) {
   // DEBUG_PRINTLN("Executing instruction %d at IPC %ld", instr.opcode,
-  // module->instruction_pointer);
+  //               module->instruction_pointer);
 
   switch (instr.opcode) {
     case OP_LoadConstant: {
@@ -69,6 +72,23 @@ void execute(Module* module, Instruction instr) {
       INCREASE_IP(module);
       break;
     }
+
+    case OP_Special: {
+      stack_push(module->stack, MAKE_SPECIAL());
+      INCREASE_IP(module);
+      break;
+    }
+
+    case OP_ConstructorName: {
+      Value v = stack_pop(module->stack);
+      // native_print(v);
+      // printf(" at IPC %d\n", module->instruction_pointer);
+      char* name = constructor_name(v);
+      stack_push(module->stack, MAKE_STRING(name));
+      INCREASE_IP(module);
+      break;
+    }
+
     case OP_TypeOf: {
       Value value = stack_pop(module->stack);
       char* type = type_of(value);
@@ -174,6 +194,7 @@ void execute(Module* module, Instruction instr) {
     }
 
     case OP_StoreGlobal: {
+      // printf("%d < %d\n", module->stack->stack_pointer, MAX_STACK_SIZE);
       module->stack->values[instr.operand1] = stack_pop(module->stack);
       // native_print(module->stack->values[instr.operand1]);
       // printf(" at %d\n", instr.operand1);
@@ -193,7 +214,7 @@ void execute(Module* module, Instruction instr) {
       Value ret = stack_pop(module->stack);
 
       module->instruction_pointer = fr.instruction_pointer;
-      module->stack->stack_pointer = fr.stack_pointer - 1;
+      module->stack->stack_pointer = fr.stack_pointer;
       stack_push(module->stack, ret);
       break;
     }

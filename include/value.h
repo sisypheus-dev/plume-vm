@@ -9,7 +9,8 @@ typedef enum {
   VALUE_STRING = 2,
   VALUE_ADDRESS = 3,
   VALUE_NATIVE = 4,
-  VALUE_LIST = 5
+  VALUE_LIST = 5,
+  VALUE_SPECIAL = 6
 } ValueType;
 
 typedef struct {
@@ -38,8 +39,10 @@ typedef struct Value {
   ((Value){.type = VALUE_ADDRESS, .address_value = value})
 #define MAKE_NATIVE(value) \
   ((Value){.type = VALUE_NATIVE, .native_value = value})
+#define MAKE_SPECIAL() ((Value){.type = VALUE_SPECIAL, .int_value = 0})
 
 char *type_of(Value v);
 Value equal(Value x, Value y);
+char *constructor_name(Value x);
 
 #endif  // VALUE_H
