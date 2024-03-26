@@ -3,11 +3,12 @@
 
 #include <stdlib.h>
 
-#define THROW(message)  \
-  do {                  \
-    printf(message);    \
-    printf("\n");       \
-    exit(EXIT_FAILURE); \
+#define THROW(message)                       \
+  do {                                       \
+    printf(message);                         \
+    printf(" at %s:%d", __FILE__, __LINE__); \
+    printf("\n");                            \
+    exit(EXIT_FAILURE);                      \
   } while (0);
 
 #define THROW_FMT(...)   \
