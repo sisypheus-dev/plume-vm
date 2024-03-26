@@ -222,6 +222,28 @@ void execute(Module* module, Instruction instr) {
       break;
     }
 
+    case OP_GetIndex: {
+      Value index = stack_pop(module->stack);
+      Value list = stack_pop(module->stack);
+      ASSERT(index.type == VALUE_INT, "Invalid index type");
+      ASSERT(list.type == VALUE_LIST, "Invalid list type");
+      ValueList l = list.list_value;
+      ASSERT(index.int_value < l.length, "Index out of bounds");
+      stack_push(module->stack, l.values[index.int_value]);
+      INCREASE_IP(module);
+      break;
+    }
+
+    case OP_And: {
+      Value x = stack_pop(module->stack);
+      Value y = stack_pop(module->stack);
+      ASSERT(x.type == VALUE_INT, "Invalid x type");
+      ASSERT(y.type == VALUE_INT, "Invalid y type");
+      stack_push(module->stack, MAKE_INTEGER(x.int_value && y.int_value));
+      INCREASE_IP(module);
+      break;
+    }
+
     case OP_ListGet: {
       Value list = stack_pop(module->stack);
       // DEBUG_STACK(module->stack);

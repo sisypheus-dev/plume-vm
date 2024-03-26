@@ -9,7 +9,6 @@ typedef enum {
   OP_LoadLocal,
   OP_StoreLocal,
   OP_LoadConstant,
-  OP_Null,
   OP_LoadGlobal,
   OP_StoreGlobal,
   OP_Return,
@@ -20,13 +19,12 @@ typedef enum {
   OP_MakeList,
   OP_ListGet,
   OP_Call,
-  OP_Jump,
-  OP_JumpIf,
   OP_JumpIfRel,
   OP_TypeOf,
   OP_ConstructorName,
   OP_Phi,
-  OP_MakeLambda
+  OP_MakeLambda,
+  OP_GetIndex
 } Opcode;
 
 typedef struct {

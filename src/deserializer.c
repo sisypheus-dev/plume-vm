@@ -24,6 +24,7 @@ Instruction deserialize_instruction(FILE* file) {
     case OP_Or:
     case OP_TypeOf:
     case OP_ConstructorName:
+    case OP_GetIndex:
       break;
     default: {
       fread(&operand1, sizeof(int64_t), 1, file);
