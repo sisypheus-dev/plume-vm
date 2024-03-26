@@ -40,5 +40,6 @@ typedef struct Value {
   ((Value){.type = VALUE_NATIVE, .native_value = value})
 
 char *type_of(Value v);
+Value equal(Value x, Value y);
 
 #endif  // VALUE_H

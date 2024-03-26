@@ -216,17 +216,7 @@ void execute(Module* module, Instruction instr) {
       Value y = stack_pop(module->stack);
       ASSERT(x.type == y.type, "Cannot compare different types");
       if (instr.operand1 == 2) {
-        if (x.type == VALUE_INT) {
-          stack_push(module->stack, MAKE_INTEGER(y.int_value == x.int_value));
-        } else if (x.type == VALUE_FLOAT) {
-          stack_push(module->stack,
-                     MAKE_INTEGER(y.float_value == x.float_value));
-        } else if (x.type == VALUE_STRING) {
-          stack_push(module->stack,
-                     MAKE_INTEGER(strcmp(y.string_value, x.string_value) == 0));
-        } else {
-          THROW_FMT("Cannot compare type %d", x.type);
-        }
+        stack_push(module->stack, equal(x, y));
       }
       INCREASE_IP(module);
       break;
