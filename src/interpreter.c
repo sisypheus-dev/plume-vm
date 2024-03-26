@@ -69,6 +69,13 @@ void execute(Module* module, Instruction instr) {
       INCREASE_IP(module);
       break;
     }
+    case OP_TypeOf: {
+      Value value = stack_pop(module->stack);
+      char* type = type_of(value);
+      stack_push(module->stack, MAKE_STRING(type));
+      INCREASE_IP(module);
+      break;
+    }
     case OP_LoadNative: {
       stack_push(module->stack, MAKE_NATIVE(instr.operand1));
       INCREASE_IP(module);
@@ -85,6 +92,7 @@ void execute(Module* module, Instruction instr) {
           Value v = stack_pop(module->stack);
           native_print(v);
           printf("\n");
+          stack_push(module->stack, MAKE_INTEGER(0));
         } else if (callee.native_value == 1) {
           Value x = stack_pop(module->stack);
           Value y = stack_pop(module->stack);
@@ -167,6 +175,8 @@ void execute(Module* module, Instruction instr) {
 
     case OP_StoreGlobal: {
       module->stack->values[instr.operand1] = stack_pop(module->stack);
+      // native_print(module->stack->values[instr.operand1]);
+      // printf(" at %d\n", instr.operand1);
       INCREASE_IP(module);
       break;
     }
@@ -204,8 +214,19 @@ void execute(Module* module, Instruction instr) {
     case OP_Compare: {
       Value x = stack_pop(module->stack);
       Value y = stack_pop(module->stack);
+      ASSERT(x.type == y.type, "Cannot compare different types");
       if (instr.operand1 == 2) {
-        stack_push(module->stack, MAKE_INTEGER(y.int_value == x.int_value));
+        if (x.type == VALUE_INT) {
+          stack_push(module->stack, MAKE_INTEGER(y.int_value == x.int_value));
+        } else if (x.type == VALUE_FLOAT) {
+          stack_push(module->stack,
+                     MAKE_INTEGER(y.float_value == x.float_value));
+        } else if (x.type == VALUE_STRING) {
+          stack_push(module->stack,
+                     MAKE_INTEGER(strcmp(y.string_value, x.string_value) == 0));
+        } else {
+          THROW_FMT("Cannot compare type %d", x.type);
+        }
       }
       INCREASE_IP(module);
       break;
@@ -213,6 +234,9 @@ void execute(Module* module, Instruction instr) {
 
     case OP_ListGet: {
       Value list = stack_pop(module->stack);
+      // DEBUG_STACK(module->stack);
+      // native_print(list);
+      // printf("\n");
       ASSERT(list.type == VALUE_LIST, "Invalid list type");
       ValueList l = list.list_value;
       ASSERT(instr.operand1 < l.length, "Index out of bounds");
