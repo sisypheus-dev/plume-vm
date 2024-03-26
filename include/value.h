@@ -39,4 +39,6 @@ typedef struct Value {
 #define MAKE_NATIVE(value) \
   ((Value){.type = VALUE_NATIVE, .native_value = value})
 
+char *type_of(Value v);
+
 #endif  // VALUE_H
