@@ -25,6 +25,7 @@ int main(int argc, char** argv) {
 
   fclose(file);
 
+  des.module->args = l;
   des.module->handles = malloc(des.libraries.num_libraries * sizeof(void*));
 
   Libraries libs = des.libraries;
