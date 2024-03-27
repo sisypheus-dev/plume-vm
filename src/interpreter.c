@@ -133,14 +133,14 @@ void execute(Module* module, Instruction instr) {
           module->natives[lib_name].functions[lib_idx] = nfun;
 
           Value* args = stack_pop_n(module->stack, argc);
-          Value ret = nfun(argc, args);
+          Value ret = nfun(argc, module, args);
           stack_push(module->stack, ret);
         } else {
           Native nfun = module->natives[lib_name].functions[lib_idx];
           ASSERT(nfun != NULL, "Native function not found");
 
           Value* args = stack_pop_n(module->stack, argc);
-          Value ret = nfun(argc, args);
+          Value ret = nfun(argc, module, args);
 
           stack_push(module->stack, ret);
         }

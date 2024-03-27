@@ -9,20 +9,25 @@
 
 typedef Value *Constants;
 
-typedef Value (*Native)(int argc, Value *args);
-
-typedef struct {
-  Native *functions;
-} NativeTable;
-
-typedef struct {
+typedef struct Module {
   size_t instruction_pointer;
 
   Constants constants;
   Stack *stack;
   CallStack *call_stack;
-  NativeTable *natives;
+  struct {
+    Value (**functions)(int argc, struct Module *m, Value *args);
+  } *natives;
   void **handles;
+  ValueList args;
 } Module;
+
+typedef Value (*Native)(int argc, Module *m, Value *args);
+
+typedef struct {
+  Bytecode bytecode;
+  Module *module;
+  Libraries libraries;
+} Deserialized;
 
 #endif  // MODULE_H

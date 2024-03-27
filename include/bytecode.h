@@ -1,7 +1,6 @@
 #ifndef BYTECODE_H
 #define BYTECODE_H
 
-#include <module.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -49,11 +48,5 @@ typedef struct {
   Library *libraries;
   size_t num_libraries;
 } Libraries;
-
-typedef struct {
-  Bytecode bytecode;
-  Module *module;
-  Libraries libraries;
-} Deserialized;
 
 #endif  // BYTECODE_H

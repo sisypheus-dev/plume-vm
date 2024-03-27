@@ -3,6 +3,7 @@
 #include <callstack.h>
 #include <core/error.h>
 #include <deserializer.h>
+#include <module.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

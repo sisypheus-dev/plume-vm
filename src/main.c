@@ -13,6 +13,12 @@ int main(int argc, char** argv) {
   if (argc < 2) THROW_FMT("Usage: %s <file>\n", argv[0]);
   FILE* file = fopen(argv[1], "rb");
 
+  ValueList l = {.length = argc};
+  l.values = malloc(argc * sizeof(Value));
+  for (int i = 0; i < argc; i++) {
+    l.values[i] = MAKE_STRING(argv[i]);
+  }
+
   if (file == NULL) THROW_FMT("Could not open file: %s\n", argv[1]);
 
   Deserialized des = deserialize(file);
