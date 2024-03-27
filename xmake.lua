@@ -1,18 +1,22 @@
 add_rules("mode.debug", "mode.release", "mode.profile")
 
-add_files("src/**.c")
-add_includedirs("include")
-
-if is_mode("profile") then
-  set_symbols("debug")
-  add_cxflags("-pg")
-  add_ldflags("-pg")
-end
-
 target("plume-vm")
+  add_files("src/**.c")
+  add_includedirs("include")
   set_kind("binary") 
   set_targetdir("bin")
   set_optimize("fastest")
-  -- set_symbols("debug")
-  -- add_cxflags("-pg")
-  -- add_ldflags("-pg")
+
+target("plume-vm-test")
+  add_files("src/**.c")
+  add_includedirs("include")
+  set_kind("binary") 
+  set_symbols("debug")
+  add_cxflags("-pg")
+  add_ldflags("-pg")
+
+target("plume-natives")
+  add_files("library/**.c")
+  add_includedirs("include")
+  set_kind("shared")
+  set_targetdir("library")
