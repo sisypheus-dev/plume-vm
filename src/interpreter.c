@@ -113,23 +113,26 @@ void execute(Module* module, Instruction instr) {
              "Invalid callee type");
 
       if (callee.type == VALUE_NATIVE) {
+        char* fun = callee.native_value;
+
         Value libIdx = stack_pop(module->stack);
-        ASSERT(libIdx.type == VALUE_INT, "Invalid library index");
+        ASSERT_FMT(libIdx.type == VALUE_INT,
+                   "Invalid library (for function %s) index", fun);
         int lib_idx = libIdx.int_value;
         Value fun_name = stack_pop(module->stack);
-        ASSERT(fun_name.type == VALUE_INT, "Invalid library");
+        ASSERT_FMT(fun_name.type == VALUE_INT,
+                   "Invalid library (for function %s)", fun);
         int lib_name = fun_name.int_value;
-        ASSERT(module->natives[lib_name].functions != NULL,
-               "Library not loaded");
-        char* fun = callee.native_value;
+        ASSERT_FMT(module->natives[lib_name].functions != NULL,
+                   "Library not loaded (for function %s)", fun);
 
         int64_t argc = instr.operand1;
 
         if (module->natives[lib_name].functions[lib_idx] == NULL) {
           void* lib = module->handles[lib_name];
-          ASSERT(lib != NULL, "Library not loaded");
+          ASSERT_FMT(lib != NULL, "Library with function %s not loaded", fun);
           Native nfun = dlsym(lib, fun);
-          ASSERT(nfun != NULL, "Native function not found");
+          ASSERT_FMT(nfun != NULL, "Native function %s not found", fun);
           module->natives[lib_name].functions[lib_idx] = nfun;
 
           Value* args = stack_pop_n(module->stack, argc);
@@ -137,7 +140,7 @@ void execute(Module* module, Instruction instr) {
           stack_push(module->stack, ret);
         } else {
           Native nfun = module->natives[lib_name].functions[lib_idx];
-          ASSERT(nfun != NULL, "Native function not found");
+          ASSERT_FMT(nfun != NULL, "Native function %s not found", fun);
 
           Value* args = stack_pop_n(module->stack, argc);
           Value ret = nfun(argc, module, args);
@@ -151,7 +154,7 @@ void execute(Module* module, Instruction instr) {
                "Call stack overflow");
 
         ValueList list = callee.list_value;
-        ASSERT(list.length == 2, "Invalid lambda list length");
+        ASSERT(list.length == 2, "Invalid lambda shape");
 
         Value ipc = list.values[0];
         Value local_space = list.values[1];
