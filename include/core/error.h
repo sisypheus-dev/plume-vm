@@ -23,4 +23,9 @@
     THROW(message);                \
   }
 
+#define ASSERT_FMT(condition, ...) \
+  if (!(condition)) {              \
+    THROW_FMT(__VA_ARGS__);        \
+  }
+
 #endif  // ERROR_H
