@@ -32,6 +32,7 @@ typedef struct {
   Opcode opcode;
   int64_t operand1;
   int64_t operand2;
+  int64_t operand3;
 } Instruction;
 
 typedef struct {
@@ -40,8 +41,19 @@ typedef struct {
 } Bytecode;
 
 typedef struct {
+  char *name;
+  size_t num_functions;
+} Library;
+
+typedef struct {
+  Library *libraries;
+  size_t num_libraries;
+} Libraries;
+
+typedef struct {
   Bytecode bytecode;
   Module *module;
+  Libraries libraries;
 } Deserialized;
 
 #endif  // BYTECODE_H

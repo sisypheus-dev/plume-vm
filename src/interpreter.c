@@ -3,6 +3,7 @@
 #include <callstack.h>
 #include <core/debug.h>
 #include <core/error.h>
+#include <dlfcn.h>
 #include <interpreter.h>
 #include <module.h>
 #include <stack.h>
@@ -41,7 +42,7 @@ void native_print(Value value) {
       break;
     }
     case VALUE_NATIVE:
-      printf("<native 0x%x>", value.native_value);
+      printf("<native %s>", value.native_value);
       break;
     case VALUE_ADDRESS:
       printf("0x%x", value.address_value);
@@ -97,7 +98,11 @@ void execute(Module* module, Instruction instr) {
       break;
     }
     case OP_LoadNative: {
-      stack_push(module->stack, MAKE_NATIVE(instr.operand1));
+      Value name = module->constants[instr.operand1];
+      ASSERT(name.type == VALUE_STRING, "Invalid native function name type");
+      stack_push(module->stack, MAKE_INTEGER(instr.operand2));
+      stack_push(module->stack, MAKE_INTEGER(instr.operand3));
+      stack_push(module->stack, MAKE_NATIVE(name.string_value));
       INCREASE_IP(module);
       break;
     }
@@ -108,31 +113,38 @@ void execute(Module* module, Instruction instr) {
              "Invalid callee type");
 
       if (callee.type == VALUE_NATIVE) {
-        if (callee.native_value == 0) {
-          Value v = stack_pop(module->stack);
-          native_print(v);
-          stack_push(module->stack, MAKE_INTEGER(0));
-        } else if (callee.native_value == 1) {
-          Value x = stack_pop(module->stack);
-          Value y = stack_pop(module->stack);
-          // printf("%lld - %lld\n", y.int_value, x.int_value);
-          stack_push(module->stack, MAKE_INTEGER(y.int_value - x.int_value));
-        } else if (callee.native_value == 2) {
-          Value x = stack_pop(module->stack);
-          Value y = stack_pop(module->stack);
-          stack_push(module->stack, MAKE_INTEGER(y.int_value * x.int_value));
-        } else if (callee.native_value == 3) {
-          Value x = stack_pop(module->stack);
-          Value y = stack_pop(module->stack);
-          stack_push(module->stack, MAKE_INTEGER(y.int_value == x.int_value));
-        } else if (callee.native_value == 4) {
-          Value x = stack_pop(module->stack);
-          Value y = stack_pop(module->stack);
-          stack_push(module->stack, MAKE_INTEGER(y.int_value + x.int_value));
+        Value libIdx = stack_pop(module->stack);
+        ASSERT(libIdx.type == VALUE_INT, "Invalid library index");
+        int lib_idx = libIdx.int_value;
+        Value fun_name = stack_pop(module->stack);
+        ASSERT(fun_name.type == VALUE_INT, "Invalid library");
+        int lib_name = fun_name.int_value;
+        ASSERT(module->natives[lib_name].functions != NULL,
+               "Library not loaded");
+        char* fun = callee.native_value;
+
+        int64_t argc = instr.operand1;
+
+        if (module->natives[lib_name].functions[lib_idx] == NULL) {
+          void* lib = module->handles[lib_name];
+          ASSERT(lib != NULL, "Library not loaded");
+          Native nfun = dlsym(lib, fun);
+          ASSERT(nfun != NULL, "Native function not found");
+          module->natives[lib_name].functions[lib_idx] = nfun;
+
+          Value* args = stack_pop_n(module->stack, argc);
+          Value ret = nfun(argc, args);
+          stack_push(module->stack, ret);
         } else {
-          THROW_FMT("Unknown native function, received %d",
-                    callee.native_value);
+          Native nfun = module->natives[lib_name].functions[lib_idx];
+          ASSERT(nfun != NULL, "Native function not found");
+
+          Value* args = stack_pop_n(module->stack, argc);
+          Value ret = nfun(argc, args);
+
+          stack_push(module->stack, ret);
         }
+
         INCREASE_IP(module);
       } else if (callee.type == VALUE_LIST) {
         ASSERT(module->call_stack->frame_pointer < MAX_FRAMES,

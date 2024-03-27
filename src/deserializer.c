@@ -14,7 +14,7 @@ Instruction deserialize_instruction(FILE* file) {
   uint8_t opcode;
   fread(&opcode, sizeof(uint8_t), 1, file);
 
-  int64_t operand1 = 0, operand2 = 0;
+  int64_t operand1 = 0, operand2 = 0, operand3 = 0;
 
   instr.opcode = opcode;
 
@@ -27,6 +27,12 @@ Instruction deserialize_instruction(FILE* file) {
     case OP_GetIndex:
     case OP_Special:
       break;
+    case OP_LoadNative: {
+      fread(&operand1, sizeof(int64_t), 1, file);
+      fread(&operand2, sizeof(int64_t), 1, file);
+      fread(&operand3, sizeof(int64_t), 1, file);
+      break;
+    }
     default: {
       fread(&operand1, sizeof(int64_t), 1, file);
       switch (opcode) {
@@ -41,6 +47,7 @@ Instruction deserialize_instruction(FILE* file) {
   }
   instr.operand1 = operand1;
   instr.operand2 = operand2;
+  instr.operand3 = operand3;
 
   return instr;
 }
@@ -119,20 +126,56 @@ Constants deserialize_constants(FILE* file) {
   return constants;
 }
 
+Libraries deserialize_libraries(FILE* file) {
+  Libraries libraries;
+
+  int64_t library_count;
+  fread(&library_count, sizeof(int64_t), 1, file);
+
+  libraries.num_libraries = library_count;
+  libraries.libraries = malloc(library_count * sizeof(Library));
+
+  for (size_t i = 0; i < library_count; i++) {
+    int64_t length;
+    fread(&length, sizeof(int64_t), 1, file);
+
+    char* library_name = malloc(length + 1);
+    fread(library_name, sizeof(char), length, file);
+    library_name[length] = '\0';
+
+    Library lib;
+
+    int64_t function_count;
+    fread(&function_count, sizeof(int64_t), 1, file);
+
+    lib.num_functions = function_count;
+    lib.name = library_name;
+
+    libraries.libraries[i] = lib;
+  }
+
+  assert(libraries.libraries != NULL);
+
+  return libraries;
+}
+
 Deserialized deserialize(FILE* file) {
   Module* module = malloc(sizeof(Module));
 
   Bytecode bytecode = deserialize_bytecode(file);
   Constants constants = deserialize_constants(file);
+  Libraries libraries = deserialize_libraries(file);
 
   module->instruction_pointer = 0;
   module->constants = constants;
   module->stack = stack_new();
   module->call_stack = callstack_new();
+  module->natives = calloc(libraries.num_libraries, sizeof(Native));
 
   Deserialized deserialized;
   deserialized.module = module;
   deserialized.bytecode = bytecode;
+  deserialized.libraries = libraries;
 
   return deserialized;
 }

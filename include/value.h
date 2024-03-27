@@ -25,7 +25,7 @@ typedef struct Value {
     double float_value;
     char *string_value;
     uint16_t address_value;
-    uint8_t native_value;
+    char *native_value;
     ValueList list_value;
   };
 } Value;
