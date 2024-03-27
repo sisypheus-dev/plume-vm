@@ -10,3 +10,7 @@ flamegraph.svg
 
 bin
 .vscode
+
+*.dylib
+*.so
+*.dll
