@@ -246,6 +246,11 @@ void execute(Module* module, Instruction instr) {
       break;
     }
 
+    case OP_JumpRel: {
+      INCREASE_IP_BY(module, instr.operand1);
+      break;
+    }
+
     case OP_Compare: {
       Value x = stack_pop(module->stack);
       Value y = stack_pop(module->stack);
