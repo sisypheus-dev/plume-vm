@@ -1,6 +1,5 @@
-add_rules("mode.debug", "mode.release", "mode.profile")
-
 target("plume-vm")
+  add_rules("mode.release")
   add_files("src/**.c")
   add_includedirs("include")
   set_kind("binary") 
@@ -8,6 +7,7 @@ target("plume-vm")
   set_optimize("fastest")
 
 target("plume-vm-test")
+  add_rules("mode.debug", "mode.profile")
   add_files("src/**.c")
   add_includedirs("include")
   set_kind("binary") 
