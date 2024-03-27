@@ -11,8 +11,16 @@ char* type_of(Value v) {
       return "float";
     case VALUE_STRING:
       return "string";
-    case VALUE_LIST:
-      return "[]";
+    case VALUE_LIST: {
+      ValueList list = v.list_value;
+      if (list.length == 0 || list.values[0].type != VALUE_SPECIAL) return "[]";
+
+      Value str = list.values[1];
+
+      ASSERT(str.type == VALUE_STRING, "Constructor name must be a string");
+
+      return str.string_value;
+    }
     default:
       THROW_FMT("Unknown value type: %d", v.type);
   }

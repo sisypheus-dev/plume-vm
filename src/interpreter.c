@@ -111,7 +111,6 @@ void execute(Module* module, Instruction instr) {
         if (callee.native_value == 0) {
           Value v = stack_pop(module->stack);
           native_print(v);
-          printf("\n");
           stack_push(module->stack, MAKE_INTEGER(0));
         } else if (callee.native_value == 1) {
           Value x = stack_pop(module->stack);
