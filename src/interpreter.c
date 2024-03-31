@@ -252,11 +252,22 @@ void execute(Module* module, Instruction instr) {
     }
 
     case OP_Compare: {
-      Value x = stack_pop(module->stack);
       Value y = stack_pop(module->stack);
+      Value x = stack_pop(module->stack);
       ASSERT(x.type == y.type, "Cannot compare different types");
-      if (instr.operand1 == 2) {
+      if (instr.operand1 == EqualTo) {
         stack_push(module->stack, equal(x, y));
+      } else if (instr.operand1 == GreaterThan) {
+        ASSERT(x.type == VALUE_INT || x.type == VALUE_FLOAT,
+               "Invalid type for comparison");
+        if (x.type == VALUE_INT) {
+          stack_push(module->stack, MAKE_INTEGER(x.int_value > y.int_value));
+        } else {
+          stack_push(module->stack,
+                     MAKE_INTEGER(x.float_value > y.float_value));
+        }
+      } else {
+        THROW_FMT("Unknown comparison type: %lld", instr.operand1);
       }
       INCREASE_IP(module);
       break;
@@ -305,6 +316,31 @@ void execute(Module* module, Instruction instr) {
         list.values[instr.operand1 - i - 1] = stack_pop(module->stack);
       }
       stack_push(module->stack, MAKE_LIST(list));
+      INCREASE_IP(module);
+      break;
+    }
+
+    case OP_ListLength: {
+      Value list = stack_pop(module->stack);
+      ASSERT(list.type == VALUE_LIST, "Invalid list type");
+      ValueList l = list.list_value;
+      stack_push(module->stack, MAKE_INTEGER(l.length));
+      INCREASE_IP(module);
+      break;
+    }
+
+    case OP_Slice: {
+      int64_t idx = instr.operand1;
+      Value list = stack_pop(module->stack);
+      ASSERT(list.type == VALUE_LIST, "Invalid list type");
+      ValueList l = list.list_value;
+      ValueList new_list;
+
+      new_list.length = l.length - idx;
+      new_list.values = malloc(sizeof(Value) * new_list.length);
+
+      memcpy(new_list.values, l.values + idx, new_list.length * sizeof(Value));
+      stack_push(module->stack, MAKE_LIST(new_list));
       INCREASE_IP(module);
       break;
     }

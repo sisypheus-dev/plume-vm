@@ -25,7 +25,9 @@ typedef enum {
   OP_MakeLambda,
   OP_GetIndex,
   OP_Special,
-  OP_JumpRel
+  OP_JumpRel,
+  OP_Slice,
+  OP_ListLength,
 } Opcode;
 
 typedef struct {
@@ -49,5 +51,14 @@ typedef struct {
   Library *libraries;
   size_t num_libraries;
 } Libraries;
+
+typedef enum {
+  LessThan = 0,
+  GreaterThan = 1,
+  EqualTo = 2,
+  NotEqualTo = 3,
+  LessThanOrEqualTo = 4,
+  GreaterThanOrEqualTo = 5,
+} Comparison;
 
 #endif  // BYTECODE_H
