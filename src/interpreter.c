@@ -135,8 +135,10 @@ void execute(Module* module, Instruction instr) {
           ASSERT_FMT(nfun != NULL, "Native function %s not found", fun);
           module->natives[lib_name].functions[lib_idx] = nfun;
 
+          // printf("Calling %s with %lld args\n", fun, argc);
           Value* args = stack_pop_n(module->stack, argc);
           Value ret = nfun(argc, module, args);
+          // DEBUG_STACK(module->stack);
           stack_push(module->stack, ret);
         } else {
           Native nfun = module->natives[lib_name].functions[lib_idx];
@@ -162,14 +164,12 @@ void execute(Module* module, Instruction instr) {
         ASSERT(ipc.type == VALUE_ADDRESS, "Invalid ipc type");
         ASSERT(local_space.type == VALUE_INT, "Invalid local space type");
 
-        uint16_t sp = module->stack->stack_pointer;
+        uint16_t sp = module->stack->stack_pointer - instr.operand1;
         Frame fr = frame_new(module->instruction_pointer + 1, sp,
                              local_space.int_value);
         Value* locals = stack_pop_n(module->stack, instr.operand1);
 
-        for (int i = 0; i < instr.operand1; i++) {
-          fr.locals[i] = locals[i];
-        }
+        memcpy(fr.locals, locals, instr.operand1 * sizeof(Value));
 
         CALLSTACK_PUSH(module->call_stack, fr);
 
@@ -312,9 +312,8 @@ void execute(Module* module, Instruction instr) {
       ValueList list;
       list.length = instr.operand1;
       list.values = malloc(sizeof(Value) * instr.operand1);
-      for (int i = 0; i < instr.operand1; i++) {
-        list.values[instr.operand1 - i - 1] = stack_pop(module->stack);
-      }
+      memcpy(list.values, stack_pop_n(module->stack, instr.operand1),
+             instr.operand1 * sizeof(Value));
       stack_push(module->stack, MAKE_LIST(list));
       INCREASE_IP(module);
       break;
@@ -339,7 +338,7 @@ void execute(Module* module, Instruction instr) {
       new_list.length = l.length - idx;
       new_list.values = malloc(sizeof(Value) * new_list.length);
 
-      memcpy(new_list.values, l.values + idx, new_list.length * sizeof(Value));
+      memcpy(new_list.values, &l.values[idx], (l.length - idx) * sizeof(Value));
       stack_push(module->stack, MAKE_LIST(new_list));
       INCREASE_IP(module);
       break;
