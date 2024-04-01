@@ -1,9 +1,8 @@
 #include <core/debug.h>
 #include <core/error.h>
+#include <core/library.h>
 #include <deserializer.h>
-#include <dlfcn.h>
 #include <interpreter.h>
-#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -33,7 +32,7 @@ int main(int argc, char** argv) {
   for (int i = 0; i < des.libraries.num_libraries; i++) {
     Library lib = libs.libraries[i];
     char* path = lib.name;
-    des.module->handles[i] = dlopen(path, RTLD_LAZY);
+    des.module->handles[i] = load_library(path);
     des.module->natives[i].functions =
         calloc(lib.num_functions, sizeof(Native));
   }

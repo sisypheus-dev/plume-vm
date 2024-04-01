@@ -3,7 +3,7 @@
 #include <callstack.h>
 #include <core/debug.h>
 #include <core/error.h>
-#include <dlfcn.h>
+#include <core/library.h>
 #include <interpreter.h>
 #include <module.h>
 #include <stack.h>
@@ -131,7 +131,7 @@ void execute(Module* module, Instruction instr) {
         if (module->natives[lib_name].functions[lib_idx] == NULL) {
           void* lib = module->handles[lib_name];
           ASSERT_FMT(lib != NULL, "Library with function %s not loaded", fun);
-          Native nfun = dlsym(lib, fun);
+          Native nfun = get_proc_address(lib, fun);
           ASSERT_FMT(nfun != NULL, "Native function %s not found", fun);
           module->natives[lib_name].functions[lib_idx] = nfun;
 

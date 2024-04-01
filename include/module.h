@@ -3,6 +3,7 @@
 
 #include <bytecode.h>
 #include <callstack.h>
+#include <core/library.h>
 #include <stack.h>
 #include <stdlib.h>
 #include <value.h>
@@ -18,7 +19,7 @@ typedef struct Module {
   struct {
     Value (**functions)(int argc, struct Module *m, Value *args);
   } *natives;
-  void **handles;
+  DLL *handles;
   ValueList args;
 } Module;
 
