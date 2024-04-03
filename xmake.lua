@@ -1,11 +1,3 @@
-package("plume")
-  set_urls("https://github.com/plume-lang/runtime.git")
-  set_license("MIT")
-  add_deps("plume-vm")
-  on_install(function (package)
-    os.cp("include", package:installdir())
-  end)
-
 target("plume-vm")
   add_rules("mode.release")
   add_files("src/**.c")
