@@ -5,8 +5,8 @@
 #include <string.h>
 #include <value.h>
 
-#define GLOBALS_SIZE 50
-#define MAX_STACK_SIZE 8192
+#define GLOBALS_SIZE 256
+#define MAX_STACK_SIZE GLOBALS_SIZE * 32
 #define VALUE_STACK_SIZE MAX_STACK_SIZE - GLOBALS_SIZE
 #define BASE_POINTER GLOBALS_SIZE
 
