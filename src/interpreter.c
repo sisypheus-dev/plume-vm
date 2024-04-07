@@ -344,6 +344,12 @@ void execute(Module* module, Instruction instr) {
       break;
     }
 
+    case OP_Halt: {
+      module->instruction_pointer = -1;
+      halt = 1;
+      break;
+    }
+
     default: {
       module->instruction_pointer = -1;
       THROW_FMT("Unknown opcode: %d", instr.opcode);

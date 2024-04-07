@@ -28,6 +28,7 @@ typedef enum {
   OP_JumpRel,
   OP_Slice,
   OP_ListLength,
+  OP_Halt,
 } Opcode;
 
 typedef struct {
