@@ -29,6 +29,10 @@ typedef enum {
   OP_Slice,
   OP_ListLength,
   OP_Halt,
+  OP_UpdateGlobal,
+  OP_UpdateLocal,
+  OP_MakeMutable,
+  OP_UnMut,
 } Opcode;
 
 typedef struct {

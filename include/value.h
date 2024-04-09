@@ -10,7 +10,8 @@ typedef enum {
   VALUE_ADDRESS = 3,
   VALUE_NATIVE = 4,
   VALUE_LIST = 5,
-  VALUE_SPECIAL = 6
+  VALUE_SPECIAL = 6,
+  VALUE_MUTABLE = 7,
 } ValueType;
 
 typedef struct {
@@ -27,6 +28,7 @@ typedef struct Value {
     uint16_t address_value;
     char *native_value;
     ValueList list_value;
+    struct Value *mutable_value;
   };
 } Value;
 
@@ -40,6 +42,8 @@ typedef struct Value {
 #define MAKE_NATIVE(value) \
   ((Value){.type = VALUE_NATIVE, .native_value = value})
 #define MAKE_SPECIAL() ((Value){.type = VALUE_SPECIAL, .int_value = 0})
+#define MAKE_MUTABLE(value) \
+  ((Value){.type = VALUE_MUTABLE, .mutable_value = value})
 
 char *type_of(Value v);
 Value equal(Value x, Value y);

@@ -13,6 +13,12 @@
 #define INCREASE_IP_BY(mod, x) mod->instruction_pointer += x
 #define INCREASE_IP(mod) INCREASE_IP_BY(mod, 1)
 
+Value unmut(Value mut) {
+  ASSERT(mut.type == VALUE_MUTABLE, "Cannot unmut non-mutable value");
+  Value* v = mut.mutable_value;
+  return *v;
+}
+
 int halt = 0;
 
 void native_print(Value value) {
@@ -39,6 +45,12 @@ void native_print(Value value) {
         }
       }
       printf("]");
+      break;
+    }
+    case VALUE_MUTABLE: {
+      printf("<mutable ");
+      native_print(*value.mutable_value);
+      printf(">");
       break;
     }
     case VALUE_NATIVE:
@@ -340,6 +352,46 @@ void execute(Module* module, Instruction instr) {
 
       memcpy(new_list.values, &l.values[idx], (l.length - idx) * sizeof(Value));
       stack_push(module->stack, MAKE_LIST(new_list));
+      INCREASE_IP(module);
+      break;
+    }
+
+    case OP_MakeMutable: {
+      Value value = stack_pop(module->stack);
+      Value* v = malloc(sizeof(Value));
+      memcpy(v, &value, sizeof(Value));
+      Value mutable = MAKE_MUTABLE(v);
+      stack_push(module->stack, mutable);
+      INCREASE_IP(module);
+      break;
+    }
+
+    case OP_UpdateGlobal: {
+      Value value = stack_pop(module->stack);
+      Value val = module->stack->values[instr.operand1];
+      ASSERT(val.type == VALUE_MUTABLE, "Invalid mutable type");
+      Value* v = val.mutable_value;
+
+      memcpy(v, &value, sizeof(Value));
+
+      INCREASE_IP(module);
+      break;
+    }
+
+    case OP_UpdateLocal: {
+      Value value = stack_pop(module->stack);
+      Frame fr = CALLSTACK_PEEK(module->call_stack);
+      Value val = fr.locals[instr.operand1];
+      ASSERT(val.type == VALUE_MUTABLE, "Invalid mutable type");
+      memcpy(val.mutable_value, &value, sizeof(Value));
+      INCREASE_IP(module);
+      break;
+    }
+
+    case OP_UnMut: {
+      Value value = stack_pop(module->stack);
+      ASSERT(value.type == VALUE_MUTABLE, "Invalid mutable type");
+      stack_push(module->stack, unmut(value));
       INCREASE_IP(module);
       break;
     }
