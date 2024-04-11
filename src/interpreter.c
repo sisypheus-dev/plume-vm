@@ -366,24 +366,12 @@ void execute(Module* module, Instruction instr) {
       break;
     }
 
-    case OP_UpdateGlobal: {
+    case OP_Update: {
+      Value var = stack_pop(module->stack);
+      ASSERT(var.type == VALUE_MUTABLE, "Invalid mutable type");
+
       Value value = stack_pop(module->stack);
-      Value val = module->stack->values[instr.operand1];
-      ASSERT(val.type == VALUE_MUTABLE, "Invalid mutable type");
-      Value* v = val.mutable_value;
-
-      memcpy(v, &value, sizeof(Value));
-
-      INCREASE_IP(module);
-      break;
-    }
-
-    case OP_UpdateLocal: {
-      Value value = stack_pop(module->stack);
-      Frame fr = CALLSTACK_PEEK(module->call_stack);
-      Value val = fr.locals[instr.operand1];
-      ASSERT(val.type == VALUE_MUTABLE, "Invalid mutable type");
-      memcpy(val.mutable_value, &value, sizeof(Value));
+      memcpy(var.mutable_value, &value, sizeof(Value));
       INCREASE_IP(module);
       break;
     }

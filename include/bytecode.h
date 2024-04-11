@@ -29,8 +29,7 @@ typedef enum {
   OP_Slice,
   OP_ListLength,
   OP_Halt,
-  OP_UpdateGlobal,
-  OP_UpdateLocal,
+  OP_Update,
   OP_MakeMutable,
   OP_UnMut,
 } Opcode;

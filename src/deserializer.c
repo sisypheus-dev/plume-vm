@@ -30,6 +30,7 @@ Instruction deserialize_instruction(FILE* file) {
     case OP_ListLength:
     case OP_Halt:
     case OP_MakeMutable:
+    case OP_Update:
     case OP_UnMut:
       break;
     case OP_LoadNative: {
