@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
         calloc(lib.num_functions, sizeof(Native));
   }
 
-  DEBUG_PRINTLN("Instruction count: %lld", des.bytecode.instruction_count);
+  DEBUG_PRINTLN("Instruction count: %lld", des.instr_count);
 
   run_interpreter(des);
 

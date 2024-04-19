@@ -67,3 +67,44 @@ Value equal(Value x, Value y) {
       THROW("Cannot compare values of unknown type");
   }
 }
+
+void native_print(Value value) {
+  switch (value.type) {
+    case VALUE_INT:
+      printf("%lld", value.int_value);
+      break;
+    case VALUE_SPECIAL:
+      printf("<special>");
+      break;
+    case VALUE_FLOAT:
+      printf("%f", value.float_value);
+      break;
+    case VALUE_STRING:
+      printf("%s", value.string_value);
+      break;
+    case VALUE_LIST: {
+      ValueList list = value.list_value;
+      printf("[");
+      for (int i = 0; i < list.length; i++) {
+        native_print(list.values[i]);
+        if (i < list.length - 1) {
+          printf(", ");
+        }
+      }
+      printf("]");
+      break;
+    }
+    case VALUE_MUTABLE: {
+      printf("<mutable ");
+      native_print(*value.mutable_value);
+      printf(">");
+      break;
+    }
+    case VALUE_NATIVE:
+      printf("<native %s>", value.native_value);
+      break;
+    case VALUE_ADDRESS:
+      printf("0x%x", value.address_value);
+      break;
+  }
+}

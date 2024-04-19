@@ -20,11 +20,16 @@ void stack_free(Stack *stack);
 
 #define DOES_OVERFLOW(stack, n) stack->stack_pointer + n >= MAX_STACK_SIZE
 #define DOES_UNDERFLOW(stack, n) stack->stack_pointer - n < BASE_POINTER
+#define stack_push(stack, value) \
+  stack->values[stack->stack_pointer++] = value
 
-extern void stack_push(Stack *stack, Value value);
-extern Value stack_pop(Stack *stack);
+#define stack_pop(stack) \
+  stack->values[--stack->stack_pointer]
+
+#define stack_pop_n(stack, n) \
+  &stack->values[stack->stack_pointer -= n]
+
 Value stack_peek(Stack *stack);
 void stack_push_n(Stack *stack, Value *values, size_t n);
-Value *stack_pop_n(Stack *stack, size_t n);
 
 #endif  // STACK_H

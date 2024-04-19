@@ -48,5 +48,6 @@ typedef struct Value {
 char *type_of(Value v);
 Value equal(Value x, Value y);
 char *constructor_name(Value x);
+void native_print(Value value);
 
 #endif  // VALUE_H

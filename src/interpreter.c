@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <value.h>
 
-#define INCREASE_IP_BY(mod, x) mod->instruction_pointer += x
+#define INCREASE_IP_BY(mod, x) mod->instruction_pointer += ((x) * 4)
 #define INCREASE_IP(mod) INCREASE_IP_BY(mod, 1)
 
 Value unmut(Value mut) {
@@ -21,66 +21,10 @@ Value unmut(Value mut) {
 
 int halt = 0;
 
-void native_print(Value value) {
-  switch (value.type) {
-    case VALUE_INT:
-      printf("%lld", value.int_value);
-      break;
-    case VALUE_SPECIAL:
-      printf("<special>");
-      break;
-    case VALUE_FLOAT:
-      printf("%f", value.float_value);
-      break;
-    case VALUE_STRING:
-      printf("%s", value.string_value);
-      break;
-    case VALUE_LIST: {
-      ValueList list = value.list_value;
-      printf("[");
-      for (int i = 0; i < list.length; i++) {
-        native_print(list.values[i]);
-        if (i < list.length - 1) {
-          printf(", ");
-        }
-      }
-      printf("]");
-      break;
-    }
-    case VALUE_MUTABLE: {
-      printf("<mutable ");
-      native_print(*value.mutable_value);
-      printf(">");
-      break;
-    }
-    case VALUE_NATIVE:
-      printf("<native %s>", value.native_value);
-      break;
-    case VALUE_ADDRESS:
-      printf("0x%x", value.address_value);
-      break;
-  }
-}
-
-void print_frame(Frame fr) {
-  printf("Frame: { IP: %ld, SP: %ld, Locals: [", fr.instruction_pointer,
-         fr.stack_pointer);
-  for (int i = 0; i < fr.num_locals; i++) {
-    native_print(fr.locals[i]);
-    if (i < fr.num_locals - 1) {
-      printf(", ");
-    }
-  }
-  printf("] }\n");
-}
-
-void execute(Module* module, Instruction instr) {
-  // DEBUG_PRINTLN("Executing instruction %d at IPC %ld", instr.opcode,
-  //               module->instruction_pointer);
-
-  switch (instr.opcode) {
+void execute(Module* module, Opcode op, int64_t i1, int64_t i2, int64_t i3) {
+  switch (op) {
     case OP_LoadConstant: {
-      Value value = module->constants[instr.operand1];
+      Value value = module->constants[i1];
       stack_push(module->stack, value);
       INCREASE_IP(module);
       break;
@@ -94,8 +38,6 @@ void execute(Module* module, Instruction instr) {
 
     case OP_ConstructorName: {
       Value v = stack_pop(module->stack);
-      // native_print(v);
-      // printf(" at IPC %d\n", module->instruction_pointer);
       char* name = constructor_name(v);
       stack_push(module->stack, MAKE_STRING(name));
       INCREASE_IP(module);
@@ -110,10 +52,10 @@ void execute(Module* module, Instruction instr) {
       break;
     }
     case OP_LoadNative: {
-      Value name = module->constants[instr.operand1];
+      Value name = module->constants[i1];
       ASSERT(name.type == VALUE_STRING, "Invalid native function name type");
-      stack_push(module->stack, MAKE_INTEGER(instr.operand2));
-      stack_push(module->stack, MAKE_INTEGER(instr.operand3));
+      stack_push(module->stack, MAKE_INTEGER(i2));
+      stack_push(module->stack, MAKE_INTEGER(i3));
       stack_push(module->stack, MAKE_NATIVE(name.string_value));
       INCREASE_IP(module);
       break;
@@ -138,7 +80,7 @@ void execute(Module* module, Instruction instr) {
         ASSERT_FMT(module->natives[lib_name].functions != NULL,
                    "Library not loaded (for function %s)", fun);
 
-        int64_t argc = instr.operand1;
+        int64_t argc = i1;
 
         if (module->natives[lib_name].functions[lib_idx] == NULL) {
           void* lib = module->handles[lib_name];
@@ -147,10 +89,8 @@ void execute(Module* module, Instruction instr) {
           ASSERT_FMT(nfun != NULL, "Native function %s not found", fun);
           module->natives[lib_name].functions[lib_idx] = nfun;
 
-          // printf("Calling %s with %lld args\n", fun, argc);
           Value* args = stack_pop_n(module->stack, argc);
           Value ret = nfun(argc, module, args);
-          // DEBUG_STACK(module->stack);
           stack_push(module->stack, ret);
         } else {
           Native nfun = module->natives[lib_name].functions[lib_idx];
@@ -164,8 +104,7 @@ void execute(Module* module, Instruction instr) {
 
         INCREASE_IP(module);
       } else if (callee.type == VALUE_LIST) {
-        ASSERT(module->call_stack->frame_pointer < MAX_FRAMES,
-               "Call stack overflow");
+        ASSERT(module->callstack < MAX_FRAMES, "Call stack overflow");
 
         ValueList list = callee.list_value;
         ASSERT(list.length == 2, "Invalid lambda shape");
@@ -176,15 +115,8 @@ void execute(Module* module, Instruction instr) {
         ASSERT(ipc.type == VALUE_ADDRESS, "Invalid ipc type");
         ASSERT(local_space.type == VALUE_INT, "Invalid local space type");
 
-        uint16_t sp = module->stack->stack_pointer - instr.operand1;
-        Frame fr = frame_new(module->instruction_pointer + 1, sp,
-                             local_space.int_value);
-        Value* locals = stack_pop_n(module->stack, instr.operand1);
-
-        memcpy(fr.locals, locals, instr.operand1 * sizeof(Value));
-
-        CALLSTACK_PUSH(module->call_stack, fr);
-
+        size_t sp = create_frame(module, module->instruction_pointer + 4, i1);
+        
         module->instruction_pointer = ipc.address_value;
       } else {
         THROW_FMT("Invalid callee type, received %d", callee.type);
@@ -195,81 +127,126 @@ void execute(Module* module, Instruction instr) {
       ValueList list;
       list.length = 2;
       list.values = malloc(sizeof(Value) * 2);
-      list.values[0] = MAKE_ADDRESS(module->instruction_pointer + 1);
-      list.values[1] = MAKE_INTEGER(instr.operand2);
+      list.values[0] = MAKE_ADDRESS(module->instruction_pointer + 4);
+      list.values[1] = MAKE_INTEGER(i2);
 
       Value lambda = MAKE_LIST(list);
       stack_push(module->stack, lambda);
-      INCREASE_IP_BY(module, instr.operand1 + 1);
+      INCREASE_IP_BY(module, i1 + 1);
       break;
     }
 
     case OP_LoadLocal: {
-      Frame fr = CALLSTACK_PEEK(module->call_stack);
-      Value value = fr.locals[instr.operand1];
+      Value value = module->stack->values[module->base_pointer + 3 + i1];
       stack_push(module->stack, value);
       INCREASE_IP(module);
       break;
     }
 
     case OP_StoreLocal: {
-      Frame fr = CALLSTACK_PEEK(module->call_stack);
-      fr.locals[instr.operand1] = stack_pop(module->stack);
+      module->stack->values[module->base_pointer + 3 + i1] = stack_pop(module->stack);
+      INCREASE_IP(module);
+      break;
+    }
+
+    case OP_Add: {
+      Value x = stack_pop(module->stack);
+      Value y = stack_pop(module->stack);
+
+      ASSERT(x.type == y.type && x.type == VALUE_INT, "Cannot add different types");
+
+      stack_push(module->stack, MAKE_INTEGER(x.int_value + y.int_value));
+      INCREASE_IP(module);
+      break;
+    }
+
+    case OP_Sub: {
+      Value x = stack_pop(module->stack);
+      Value y = stack_pop(module->stack);
+
+      ASSERT(x.type == y.type && x.type == VALUE_INT, "Cannot subtract different types");
+
+      stack_push(module->stack, MAKE_INTEGER(y.int_value - x.int_value));
       INCREASE_IP(module);
       break;
     }
 
     case OP_StoreGlobal: {
-      // printf("%d < %d\n", module->stack->stack_pointer, MAX_STACK_SIZE);
-      module->stack->values[instr.operand1] = stack_pop(module->stack);
-      // native_print(module->stack->values[instr.operand1]);
-      // printf(" at %d\n", instr.operand1);
+      module->stack->values[i1] = stack_pop(module->stack);
+      
       INCREASE_IP(module);
       break;
     }
 
     case OP_LoadGlobal: {
-      Value value = module->stack->values[instr.operand1];
+      Value value = module->stack->values[i1];
       stack_push(module->stack, value);
       INCREASE_IP(module);
       break;
     }
 
     case OP_Return: {
-      Frame fr = CALLSTACK_POP(module->call_stack);
+      Frame fr = pop_frame(module);
       Value ret = stack_pop(module->stack);
 
       module->instruction_pointer = fr.instruction_pointer;
       module->stack->stack_pointer = fr.stack_pointer;
+      module->base_pointer = fr.base_ptr;
       stack_push(module->stack, ret);
+
+      module->callstack--;
+
       break;
     }
 
     case OP_JumpIfRel: {
       Value value = stack_pop(module->stack);
       ASSERT(value.type == VALUE_INT, "Invalid value type")
-      // DEBUG_PRINTLN("Jumping if %lld is 1 to %lld", value.int_value,
-      //               module->instruction_pointer + instr.operand1);
       if (value.int_value == 0) {
-        INCREASE_IP_BY(module, instr.operand1);
+        INCREASE_IP_BY(module, i1);
       } else {
         INCREASE_IP(module);
       }
       break;
     }
 
+    case OP_AddConst: {
+      Value value = stack_pop(module->stack);
+      ASSERT(value.type == VALUE_INT, "Invalid value type");
+
+      Value x = module->constants[i1];
+      ASSERT(x.type == VALUE_INT, "Invalid constant type");
+
+      stack_push(module->stack, MAKE_INTEGER(value.int_value + x.int_value));
+      INCREASE_IP(module);
+      break;
+    }
+
+    case OP_SubConst: {
+      Value value = stack_pop(module->stack);
+      ASSERT(value.type == VALUE_INT, "Invalid value type");
+
+      Value x = module->constants[i1];
+      ASSERT(x.type == VALUE_INT, "Invalid constant type");
+
+      stack_push(module->stack, MAKE_INTEGER(value.int_value - x.int_value));
+      INCREASE_IP(module);
+      break;
+    }
+
     case OP_JumpRel: {
-      INCREASE_IP_BY(module, instr.operand1);
+      INCREASE_IP_BY(module, i1);
       break;
     }
 
     case OP_Compare: {
       Value y = stack_pop(module->stack);
       Value x = stack_pop(module->stack);
+
       ASSERT(x.type == y.type, "Cannot compare different types");
-      if (instr.operand1 == EqualTo) {
+      if (i1 == EqualTo) {
         stack_push(module->stack, equal(x, y));
-      } else if (instr.operand1 == GreaterThan) {
+      } else if (i1 == GreaterThan) {
         ASSERT(x.type == VALUE_INT || x.type == VALUE_FLOAT,
                "Invalid type for comparison");
         if (x.type == VALUE_INT) {
@@ -278,10 +255,27 @@ void execute(Module* module, Instruction instr) {
           stack_push(module->stack,
                      MAKE_INTEGER(x.float_value > y.float_value));
         }
+      } else if (i1 == LessThanOrEqualTo) {
+        ASSERT(x.type == y.type && x.type == VALUE_INT, "Invalid type for comparison");
+        stack_push(module->stack, MAKE_INTEGER(x.int_value <= y.int_value));
       } else {
-        THROW_FMT("Unknown comparison type: %lld", instr.operand1);
+        THROW_FMT("Unknown comparison type: %lld", i1);
       }
       INCREASE_IP(module);
+      break;
+    }
+
+    case OP_ReturnConst: {
+      Frame fr = pop_frame(module);
+      Value ret = module->constants[i1];
+
+      module->instruction_pointer = fr.instruction_pointer;
+      module->stack->stack_pointer = fr.stack_pointer;
+      module->base_pointer = fr.base_ptr;
+
+      stack_push(module->stack, ret);
+
+      module->callstack--;
       break;
     }
 
@@ -309,23 +303,20 @@ void execute(Module* module, Instruction instr) {
 
     case OP_ListGet: {
       Value list = stack_pop(module->stack);
-      // DEBUG_STACK(module->stack);
-      // native_print(list);
-      // printf("\n");
       ASSERT(list.type == VALUE_LIST, "Invalid list type");
       ValueList l = list.list_value;
-      ASSERT(instr.operand1 < l.length, "Index out of bounds");
-      stack_push(module->stack, l.values[instr.operand1]);
+      ASSERT(i1 < l.length, "Index out of bounds");
+      stack_push(module->stack, l.values[i1]);
       INCREASE_IP(module);
       break;
     }
 
     case OP_MakeList: {
       ValueList list;
-      list.length = instr.operand1;
-      list.values = malloc(sizeof(Value) * instr.operand1);
-      memcpy(list.values, stack_pop_n(module->stack, instr.operand1),
-             instr.operand1 * sizeof(Value));
+      list.length = i1;
+      list.values = malloc(sizeof(Value) * i1);
+      memcpy(list.values, stack_pop_n(module->stack, i1),
+             i1 * sizeof(Value));
       stack_push(module->stack, MAKE_LIST(list));
       INCREASE_IP(module);
       break;
@@ -341,7 +332,7 @@ void execute(Module* module, Instruction instr) {
     }
 
     case OP_Slice: {
-      int64_t idx = instr.operand1;
+      int64_t idx = i1;
       Value list = stack_pop(module->stack);
       ASSERT(list.type == VALUE_LIST, "Invalid list type");
       ValueList l = list.list_value;
@@ -392,7 +383,7 @@ void execute(Module* module, Instruction instr) {
 
     default: {
       module->instruction_pointer = -1;
-      THROW_FMT("Unknown opcode: %d", instr.opcode);
+      THROW_FMT("Unknown opcode: %d", op);
       break;
     }
   }
@@ -400,12 +391,14 @@ void execute(Module* module, Instruction instr) {
 
 void run_interpreter(Deserialized des) {
   Module* module = des.module;
-  Bytecode bytecode = des.bytecode;
+  module->instruction_pointer = 0;
 
-  while (halt != 1 &&
-         module->instruction_pointer < bytecode.instruction_count &&
-         module->instruction_pointer >= 0) {
-    Instruction instr = bytecode.instructions[module->instruction_pointer];
-    execute(module, instr);
+  while (halt != 1 && module->instruction_pointer >= 0) {
+    Opcode opcode = des.instrs[module->instruction_pointer];
+    int64_t i1 = des.instrs[module->instruction_pointer + 1];
+    int64_t i2 = des.instrs[module->instruction_pointer + 2];
+    int64_t i3 = des.instrs[module->instruction_pointer + 3];
+
+    execute(module, opcode, i1, i2, i3);
   }
 }

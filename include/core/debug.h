@@ -25,10 +25,23 @@
     printf("]\n");                                   \
   } while (0)
 
+#define DEBUG_STACK_FROM(stack, idx)                  \
+  do {                                               \
+    printf("[");                                     \
+    for (int i = idx; i < stack->stack_pointer; i++) { \
+      native_print(stack->values[i]);                \
+      if (i < stack->stack_pointer - 1) {            \
+        printf(", ");                                \
+      }                                              \
+    }                                                \
+    printf("]\n");                                   \
+  } while (0)
+
 #else
 #define DEBUG_PRINT(...)
 #define DEBUG_PRINTLN(...)
 #define DEBUG_STACK(...)
+#define DEBUG_STACK_FROM(...)
 #endif
 
 #endif  // PLUME_DEBUG_H

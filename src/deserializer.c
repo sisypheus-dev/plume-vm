@@ -32,6 +32,8 @@ Instruction deserialize_instruction(FILE* file) {
     case OP_MakeMutable:
     case OP_Update:
     case OP_UnMut:
+    case OP_Add:
+    case OP_Sub:
       break;
     case OP_LoadNative: {
       fread(&operand1, sizeof(int64_t), 1, file);
@@ -168,20 +170,26 @@ Libraries deserialize_libraries(FILE* file) {
 Deserialized deserialize(FILE* file) {
   Module* module = malloc(sizeof(Module));
 
-  Bytecode bytecode = deserialize_bytecode(file);
   Constants constants = deserialize_constants(file);
   Libraries libraries = deserialize_libraries(file);
+
+  size_t instr_count;
+  fread(&instr_count, sizeof(int64_t), 1, file);
+
+  int64_t* instrs = malloc(instr_count * 4 * sizeof(int64_t));
+  fread(instrs, sizeof(int64_t), instr_count * 4, file);
 
   module->instruction_pointer = 0;
   module->constants = constants;
   module->stack = stack_new();
-  module->call_stack = callstack_new();
+  module->callstack = 0;
   module->natives = calloc(libraries.num_libraries, sizeof(Native));
 
   Deserialized deserialized;
   deserialized.module = module;
-  deserialized.bytecode = bytecode;
   deserialized.libraries = libraries;
+  deserialized.instr_count = instr_count;
+  deserialized.instrs = instrs;
 
   return deserialized;
 }

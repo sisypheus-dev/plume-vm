@@ -32,6 +32,11 @@ typedef enum {
   OP_Update,
   OP_MakeMutable,
   OP_UnMut,
+  OP_Add,
+  OP_Sub,
+  OP_ReturnConst,
+  OP_AddConst,
+  OP_SubConst,
 } Opcode;
 
 typedef struct {
