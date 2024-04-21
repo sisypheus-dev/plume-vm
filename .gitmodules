@@ -1,0 +1,3 @@
+[submodule "include/nanbox"]
+	path = include/nanbox
+	url = https://github.com/zuiderkwast/nanbox.git
