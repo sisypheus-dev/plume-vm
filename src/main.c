@@ -5,17 +5,18 @@
 #include <interpreter.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define PLUME_VERSION "0.0.1"
 
 int main(int argc, char** argv) {
+  unsigned long long start = clock_gettime_nsec_np(CLOCK_MONOTONIC);
   if (argc < 2) THROW_FMT("Usage: %s <file>\n", argv[0]);
   FILE* file = fopen(argv[1], "rb");
 
-  ValueList l = {.length = argc};
-  l.values = malloc(argc * sizeof(Value));
+  Value* values = malloc(argc * sizeof(Value));
   for (int i = 0; i < argc; i++) {
-    l.values[i] = MAKE_STRING(argv[i]);
+    values[i] = MAKE_STRING(argv[i], strlen(argv[i]));
   }
 
   if (file == NULL) THROW_FMT("Could not open file: %s\n", argv[1]);
@@ -24,7 +25,8 @@ int main(int argc, char** argv) {
 
   fclose(file);
 
-  des.module->args = l;
+  des.module->argc = argc;
+  des.module->argv = values;
   des.module->handles = malloc(des.libraries.num_libraries * sizeof(void*));
 
   Libraries libs = des.libraries;
@@ -37,9 +39,20 @@ int main(int argc, char** argv) {
         calloc(lib.num_functions, sizeof(Native));
   }
 
-  DEBUG_PRINTLN("Instruction count: %lld", des.instr_count);
+  DEBUG_PRINTLN("Instruction count: %zu", des.instr_count);
 
+  unsigned long long end = clock_gettime_nsec_np(CLOCK_MONOTONIC);
+
+  // Get time in milliseconds
+  unsigned long long time = (end - start) / 1000 / 1000;
+  printf("Deserialization took %lld ms\n", time);
+
+  unsigned long long start_interp = clock_gettime_nsec_np(CLOCK_MONOTONIC);
   run_interpreter(des);
+  unsigned long long end_interp = clock_gettime_nsec_np(CLOCK_MONOTONIC);
+
+  unsigned long long interp_time = (end_interp - start_interp) / 1000 / 1000;
+  printf("Interpretation took %lld ms\n", interp_time);
 
   return 0;
 }
