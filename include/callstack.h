@@ -8,7 +8,7 @@
 #define MAX_FRAMES 1024
 
 typedef struct {
-  size_t instruction_pointer;
+  reg instruction_pointer;
   size_t stack_pointer;
   size_t base_ptr;
 } Frame;
@@ -21,11 +21,8 @@ typedef struct {
 
 CallStack *callstack_new();
 void callstack_free(CallStack *callstack);
-size_t create_frame(Module *mod, size_t pc, size_t num_locals);
+size_t create_frame(Module *mod, reg pc, size_t num_locals);
 Frame pop_frame(Module *mod);
-
-extern Frame frame_new(size_t instruction_pointer, size_t stack_pointer,
-                       size_t num_locals);
 
 #define CALLSTACK_PUSH(callstack, frame) \
   callstack->frames[callstack->frame_pointer++] = frame

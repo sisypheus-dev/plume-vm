@@ -41,14 +41,14 @@ typedef enum {
 
 typedef struct {
   Opcode opcode;
-  int64_t operand1;
-  int64_t operand2;
-  int64_t operand3;
+  int32_t operand1;
+  int32_t operand2;
+  int32_t operand3;
 } Instruction;
 
 typedef struct {
   Instruction *instructions;
-  int64_t instruction_count;
+  int32_t instruction_count;
 } Bytecode;
 
 typedef struct {

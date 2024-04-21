@@ -10,7 +10,6 @@
 typedef Value *Constants;
 
 typedef struct Module {
-  size_t instruction_pointer;
   size_t base_pointer;
   size_t callstack;
 
@@ -20,7 +19,9 @@ typedef struct Module {
     Value (**functions)(int argc, struct Module *m, Value *args);
   } *natives;
   DLL *handles;
-  ValueList args;
+
+  size_t argc;
+  Value* argv;
 } Module;
 
 typedef Value (*Native)(int argc, Module *m, Value *args);
@@ -30,7 +31,7 @@ typedef struct {
   Libraries libraries;
   
   size_t instr_count;
-  int64_t *instrs;
+  int32_t *instrs;
 } Deserialized;
 
 #endif  // MODULE_H
