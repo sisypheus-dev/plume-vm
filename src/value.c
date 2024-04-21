@@ -26,7 +26,7 @@ char* type_of(Value value) {
 char* constructor_name(Value v) {
   ASSERT(get_type(v) == TYPE_LIST, "Cannot get constructor name of non-list value");
 
-  HeapValue* arr = nanbox_to_pointer(v);
+  HeapValue* arr = GET_PTR(v);
   Value* data = arr->as_ptr;
 
   ASSERT(arr->length > 0, "Cannot get constructor name of empty value");
@@ -44,14 +44,14 @@ Value equal(Value x, Value y) {
 
   switch (x_type) {
     case TYPE_INTEGER:
-      return MAKE_INTEGER(x.as_int64 == y.as_int64);
+      return MAKE_INTEGER(x == y);
     case TYPE_FLOAT:
-      return MAKE_INTEGER(x.as_double == y.as_double);
+      return MAKE_INTEGER(x == y);
     case TYPE_STRING:
       return MAKE_INTEGER(strcmp(GET_STRING(x), GET_STRING(y)) == 0);
     case TYPE_LIST: {
-      HeapValue* x_heap = nanbox_to_pointer(x);
-      HeapValue* y_heap = nanbox_to_pointer(y);
+      HeapValue* x_heap = GET_PTR(x);
+      HeapValue* y_heap = GET_PTR(y);
       if (x_heap->length != y_heap->length) {
         return MAKE_INTEGER(0);
       }
@@ -60,7 +60,7 @@ Value equal(Value x, Value y) {
       Value* y_values = y_heap->as_ptr;
 
       for (int i = 0; i < x_heap->length; i++) {
-        if (!equal(x_values[i], y_values[i]).as_int64) {
+        if ((int32_t) !equal(x_values[i], y_values[i])) {
           return MAKE_INTEGER(0);
         }
       }
@@ -79,19 +79,19 @@ void native_print(Value value) {
   ValueType val_type = get_type(value);
   switch (val_type) {
     case TYPE_INTEGER:
-      printf("%d", GET_INT(value));
+      printf("%d", (int32_t) value);
       break;
     case TYPE_SPECIAL:
       printf("<special>");
       break;
     case TYPE_FLOAT:
-      printf("%f", value.as_double);
+      printf("%f", GET_FLOAT(value));
       break;
     case TYPE_STRING:
       printf("%s", GET_STRING(value));
       break;
     case TYPE_LIST: {
-      HeapValue* list = nanbox_to_pointer(value);
+      HeapValue* list = GET_PTR(value);
       printf("[");
       for (int i = 0; i < list->length; i++) {
         native_print(list->as_ptr[i]);

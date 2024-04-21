@@ -17,7 +17,7 @@ void callstack_free(CallStack* callstack) {
   free(callstack);
 }
 
-size_t create_frame(Module* mod, reg pc, size_t num_locals) {
+inline size_t create_frame(Module* mod, reg pc, size_t num_locals) {
   size_t old_sp = mod->stack->stack_pointer - num_locals;
 
   Value* stack = mod->stack->values;

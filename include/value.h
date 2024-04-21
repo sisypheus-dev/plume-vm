@@ -3,8 +3,35 @@
 
 #include <stdint.h>
 #include <nanbox/nanbox.h>
+#include <stdlib.h>
+typedef uint64_t Value;
 
-typedef nanbox_t Value;
+// Masks for important segments of a float value
+#define MASK_SIGN        0x8000000000000000
+#define MASK_EXPONENT    0x7ff0000000000000
+#define MASK_QUIET       0x0008000000000000
+#define MASK_TYPE        0x0007000000000000
+#define MASK_SIGNATURE   0xffff000000000000
+#define MASK_PAYLOAD_PTR 0x0000ffffffffffff
+#define MASK_PAYLOAD_INT 0x00000000ffffffff
+
+// Type IDs for short encoded types
+#define MASK_TYPE_NAN     0x0000000000000000
+#define MASK_TYPE_SPECIAL 0x0001000000000000
+#define MASK_TYPE_INTEGER 0x0002000000000000
+#define MASK_TYPE_STRING  0x0003000000000000
+
+// Constant short encoded values
+#define kNaN   (MASK_EXPONENT | MASK_QUIET)
+#define kNull  (kNaN | MASK_TYPE_SPECIAL)
+
+// Signatures of encoded types
+#define SIGNATURE_NAN     kNaN
+#define SIGNATURE_SPECIAL kNull
+#define SIGNATURE_INTEGER (kNaN | MASK_TYPE_INTEGER)
+#define SIGNATURE_STRING  (kNaN | MASK_TYPE_STRING)
+#define SIGNATURE_POINTER (kNaN | MASK_SIGN)
+
 typedef int32_t reg;
 
 char *type_of(Value v);
@@ -45,15 +72,16 @@ typedef struct {
   };
 } HeapValue;
 
-#define MAKE_INTEGER(x) nanbox_from_int(x)
-#define MAKE_FLOAT(x) nanbox_from_double(x)
+#define MAKE_INTEGER(x) (SIGNATURE_INTEGER | (uint32_t) (x))
+#define MAKE_FLOAT(x) (*(Value*)(&(value)))
+#define MAKE_PTR(x) ( SIGNATURE_POINTER | (uint64_t) (x))
 
 static inline Value MAKE_STRING(char* x, uint32_t len) {
   HeapValue* v = malloc(sizeof(HeapValue));
   v->length = len;
   v->type = TYPE_STRING;
   v->as_string = x;
-  return nanbox_from_pointer(v);
+  return MAKE_PTR(v);
 }
 
 static inline Value MAKE_LIST(Value* x, uint32_t len) {
@@ -61,7 +89,7 @@ static inline Value MAKE_LIST(Value* x, uint32_t len) {
   v->length = len;
   v->type = TYPE_LIST;
   v->as_ptr = x;
-  return nanbox_from_pointer(v);
+  return MAKE_PTR(v);
 }
 
 static inline Value MAKE_MUTABLE(Value x) {
@@ -69,38 +97,41 @@ static inline Value MAKE_MUTABLE(Value x) {
   v->length = 1;
   v->type = TYPE_MUTABLE;
   v->as_ptr = &x;
-  return nanbox_from_pointer(v);
+  return MAKE_PTR(v);
 }
 
-#define MAKE_SPECIAL() nanbox_null()
-#define MAKE_FLOAT(x) nanbox_from_double(x)
-#define MAKE_ADDRESS(x) nanbox_from_int(x)
+#define MAKE_SPECIAL() kNull
+#define MAKE_ADDRESS(x) MAKE_INTEGER(x)
 #define MAKE_NATIVE(x) MAKE_STRING(x, strlen(x))
 
-#define GET_STRING(x) ((HeapValue*)nanbox_to_pointer(x))->as_string
-#define GET_LIST(x) ((HeapValue*)nanbox_to_pointer(x))->as_ptr
-#define GET_MUTABLE(x) *((Value*)((HeapValue*)nanbox_to_pointer(x))->as_ptr)
+#define GET_PTR(x) ((HeapValue*)((x) & MASK_PAYLOAD_PTR))
+#define GET_STRING(x) GET_PTR(x)->as_string
+#define GET_LIST(x) GET_PTR(x)->as_ptr
+#define GET_MUTABLE(x) *(GET_PTR(x)->as_ptr)
 
-#define GET_INT(x) nanbox_to_int(x)
-#define GET_FLOAT(x) nanbox_to_double(x)
-#define GET_ADDRESS(x) nanbox_to_int(x)
+#define GET_INT(x) ((x) & MASK_PAYLOAD_INT)
+#define GET_FLOAT(x) (*(double*)(&(x)))
+#define GET_ADDRESS(x) GET_INT(x)
 #define GET_NATIVE(x) GET_STRING(x)
 
-#define GET_PTR(x) nanbox_to_pointer(x)
-
 static inline ValueType get_type(Value value) {
-  if (nanbox_is_int(value)) {
-    return TYPE_INTEGER;
-  } else if (nanbox_is_double(value)) {
-    return TYPE_FLOAT;
-  } else if (nanbox_is_pointer(value)) {
-    HeapValue* v = nanbox_to_pointer(value);
-    return v->type;
-  } else if (nanbox_is_null(value)) {
-    return TYPE_SPECIAL;
-  } else {
-    return TYPE_UNKNOWN;
+  uint64_t signature = value & MASK_SIGNATURE;
+  if ((~value & MASK_EXPONENT) != 0) return TYPE_FLOAT;
+
+  // Check for encoded pointer
+  if (signature == SIGNATURE_POINTER) {
+    HeapValue* ptr = GET_PTR(value);
+    return ptr->type;
   }
+
+  // Short encoded types
+  switch (signature) {
+    case SIGNATURE_NAN:     return TYPE_FLOAT;
+    case SIGNATURE_SPECIAL: return TYPE_SPECIAL;
+    case SIGNATURE_INTEGER: return TYPE_INTEGER;
+  }
+
+  return TYPE_UNKNOWN;
 }
 
 #endif  // VALUE_H

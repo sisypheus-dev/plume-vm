@@ -1,7 +1,7 @@
 #ifndef PLUME_DEBUG_H
 #define PLUME_DEBUG_H
 
-#define DEBUG 1
+#define DEBUG 0
 
 #if DEBUG
 #include <stack.h>

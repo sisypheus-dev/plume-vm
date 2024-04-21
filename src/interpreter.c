@@ -17,6 +17,10 @@ int halt = 0;
 
 typedef Value (*ComparisonFun)(Value, Value);
 
+static inline Value compare_eq_int(Value a, Value b) {
+  return MAKE_INTEGER(GET_INT(a) == GET_INT(b));
+}
+
 Value compare_eq(Value a, Value b) {
   ValueType a_type = get_type(a);
   ValueType b_type = get_type(b);
@@ -24,9 +28,9 @@ Value compare_eq(Value a, Value b) {
 
   switch (a_type) {
     case TYPE_INTEGER:
-      return MAKE_INTEGER(a.as_int64 == b.as_int64);
+      return MAKE_INTEGER(a == b);
     case TYPE_FLOAT:
-      return MAKE_INTEGER(a.as_double == b.as_double);
+      return MAKE_INTEGER(GET_FLOAT(a) == GET_FLOAT(b));
     case TYPE_STRING: {
       HeapValue* a_ptr = GET_PTR(a);
       HeapValue* b_ptr = GET_PTR(b);
@@ -40,7 +44,18 @@ Value compare_eq(Value a, Value b) {
   }
 }
 
-ComparisonFun comparison_table[] = { NULL, NULL, compare_eq };
+Value compare_and(Value a, Value b) {
+  ASSERT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers");
+  return MAKE_INTEGER(GET_INT(a) && GET_INT(b));
+}
+
+Value compare_or(Value a, Value b) {
+  ASSERT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers");
+  return MAKE_INTEGER(GET_INT(a) || GET_INT(b));
+}
+
+ComparisonFun comparison_table[] = { NULL, NULL, compare_eq, NULL, NULL, compare_and, compare_or };
+ComparisonFun icomparison_table[] = { NULL, NULL, compare_eq_int, NULL, NULL, compare_and, compare_or };
 
 void op_call(Module *module, int32_t *pc, Value callee, size_t argc) {
   ASSERT(module->callstack < MAX_FRAMES, "Call stack overflow");
@@ -70,11 +85,11 @@ void op_native_call(Module *module, int32_t *pc, Value callee, size_t argc) {
   ValueType libIdx_type = get_type(libIdx);
   ASSERT_FMT(libIdx_type == TYPE_INTEGER,
               "Invalid library (for function %s) index", fun);
-  int32_t lib_idx = libIdx.as_int64;
+  int32_t lib_idx = GET_INT(libIdx);
   Value fun_name = stack_pop(module->stack);
   ASSERT_FMT(get_type(fun_name) == TYPE_INTEGER,
               "Invalid library (for function %s)", fun);
-  int32_t lib_name = fun_name.as_int64;
+  int32_t lib_name = GET_INT(fun_name);
 
   ASSERT_FMT(module->natives[lib_name].functions != NULL,
               "Library not loaded (for function %s)", fun);
@@ -124,12 +139,13 @@ void run_interpreter(Deserialized des) {
     &&case_load_global, &&case_store_global, &&case_return, 
     &&case_compare, &&case_and, &&case_or, &&case_load_native, 
     &&case_make_list, &&case_list_get, &&case_call, 
-    &&case_jump_if_rel, UNKNOWN, UNKNOWN, UNKNOWN,
+    &&case_jump_else_rel, UNKNOWN, UNKNOWN, UNKNOWN,
     &&case_make_lambda, &&case_get_index, 
     &&case_special, &&case_jump_rel, &&case_slice, &&case_list_length,
     &&case_halt, &&case_update, &&case_make_mutable, &&case_unmut, 
     &&case_add, &&case_sub, &&case_return_const, &&case_add_const, 
-    &&case_sub_const };
+    &&case_sub_const, &&case_jump_else_rel_cmp, UNKNOWN, UNKNOWN, 
+    &&case_ijump_else_rel_cmp_constant };
 
   goto *jmp_table[op];
 
@@ -182,6 +198,7 @@ void run_interpreter(Deserialized des) {
   case_compare: {
     Value a = stack_pop(module->stack);
     Value b = stack_pop(module->stack);
+
     stack_push(module->stack, comparison_table[i1](a, b));
     INCREASE_IP(pc);
     goto *jmp_table[op];
@@ -193,7 +210,7 @@ void run_interpreter(Deserialized des) {
 
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
-    stack_push(module->stack, MAKE_INTEGER(a.as_int64 && b.as_int64));
+    stack_push(module->stack, MAKE_INTEGER(a && b));
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -204,7 +221,7 @@ void run_interpreter(Deserialized des) {
 
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
-    stack_push(module->stack, MAKE_INTEGER(a.as_int64 || b.as_int64));
+    stack_push(module->stack, MAKE_INTEGER(a || b));
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -245,14 +262,14 @@ void run_interpreter(Deserialized des) {
     ASSERT(call_ty == TYPE_STRING || call_ty == TYPE_LIST, "Invalid callee type");
 
     interpreter_table[call_ty](module, &pc, callee, i1);
-    printf("OP: %d\n", op);
+
     goto *jmp_table[op];
   }
   
-  case_jump_if_rel: {
+  case_jump_else_rel: {
     Value value = stack_pop(module->stack);
     ASSERT(get_type(value) == TYPE_INTEGER, "Invalid value type")
-    if (value.as_int64 == 0) {
+    if (GET_INT(value) == 0) {
       INCREASE_IP_BY(pc, i1);
     } else {
       INCREASE_IP(pc);
@@ -281,7 +298,7 @@ void run_interpreter(Deserialized des) {
 
     HeapValue* l = GET_PTR(list);
     ASSERT(index.as_int64 < l->length, "Index out of bounds");
-    stack_push(module->stack, l->as_ptr[index.as_int64]);
+    stack_push(module->stack, l->as_ptr[index]);
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -308,7 +325,7 @@ void run_interpreter(Deserialized des) {
     new_list->as_ptr = malloc(sizeof(Value) * new_list->length);
 
     memcpy(new_list->as_ptr, &l->as_ptr[i1], (l->length - i1) * sizeof(Value));
-    stack_push(module->stack, nanbox_from_pointer(new_list));
+    stack_push(module->stack, MAKE_PTR(new_list));
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -347,7 +364,7 @@ void run_interpreter(Deserialized des) {
     l->type = TYPE_MUTABLE;
     l->length = 1;
     l->as_ptr = v;
-    Value mutable = nanbox_from_pointer(l);
+    Value mutable = MAKE_PTR(l);
     stack_push(module->stack, mutable);
     INCREASE_IP(pc);
     goto *jmp_table[op];
@@ -367,7 +384,7 @@ void run_interpreter(Deserialized des) {
     
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
-    stack_push(module->stack, MAKE_INTEGER(a.as_int64 + b.as_int64));
+    stack_push(module->stack, MAKE_INTEGER(a + b));
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -378,7 +395,7 @@ void run_interpreter(Deserialized des) {
 
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
-    stack_push(module->stack, MAKE_INTEGER(a.as_int64 - b.as_int64));
+    stack_push(module->stack, MAKE_INTEGER(a - b));
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -403,7 +420,7 @@ void run_interpreter(Deserialized des) {
 
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
-    stack_push(module->stack, MAKE_INTEGER(a.as_int64 + b.as_int64));
+    stack_push(module->stack, MAKE_INTEGER(a + b));
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -413,9 +430,41 @@ void run_interpreter(Deserialized des) {
     Value b = module->constants[i1];
 
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
-
-    stack_push(module->stack, MAKE_INTEGER(a.as_int64 - b.as_int64));
+    stack_push(module->stack, MAKE_INTEGER(a - b));
     INCREASE_IP(pc);
+    goto *jmp_table[op];
+  }
+
+  case_jump_else_rel_cmp: {
+    Value a = stack_pop(module->stack);
+    Value b = stack_pop(module->stack);
+
+    Value cmp = comparison_table[i2](a, b);
+    ASSERT(get_type(cmp) == TYPE_INTEGER, "Expected integer");
+
+    if (GET_INT(cmp) == 0) {
+      INCREASE_IP_BY(pc, i1);
+    } else {
+      INCREASE_IP(pc);
+    }
+
+    goto *jmp_table[op];
+  }
+
+  case_ijump_else_rel_cmp_constant: {
+    Value a = stack_pop(module->stack);
+    Value b = module->constants[i3];
+
+    ASSERT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers");
+
+    Value cmp = icomparison_table[i2](a, b);
+
+    if (GET_INT(cmp) == 0) {
+      INCREASE_IP_BY(pc, i1);
+    } else {
+      INCREASE_IP(pc);
+    }
+
     goto *jmp_table[op];
   }
 

@@ -21,7 +21,7 @@ typedef struct {
 
 CallStack *callstack_new();
 void callstack_free(CallStack *callstack);
-size_t create_frame(Module *mod, reg pc, size_t num_locals);
+extern size_t create_frame(Module *mod, reg pc, size_t num_locals);
 Frame pop_frame(Module *mod);
 
 #define CALLSTACK_PUSH(callstack, frame) \

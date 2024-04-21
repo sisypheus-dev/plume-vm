@@ -18,7 +18,7 @@ typedef enum {
   OP_MakeList,
   OP_ListGet,
   OP_Call,
-  OP_JumpIfRel,
+  OP_JumpElseRel,
   OP_TypeOf,
   OP_ConstructorName,
   OP_Phi,
@@ -37,6 +37,10 @@ typedef enum {
   OP_ReturnConst,
   OP_AddConst,
   OP_SubConst,
+  OP_JumpElseRelCmp,
+  OP_IJumpElseRelCmp,
+  OP_JumpElseRelCmpConst,
+  OP_IJumpElseRelCmpConst,
 } Opcode;
 
 typedef struct {
@@ -68,6 +72,8 @@ typedef enum {
   NotEqualTo = 3,
   LessThanOrEqualTo = 4,
   GreaterThanOrEqualTo = 5,
+  And = 6,
+  Or = 7,
 } Comparison;
 
 #endif  // BYTECODE_H
