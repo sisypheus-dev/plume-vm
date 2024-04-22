@@ -6,7 +6,6 @@
 #include <module.h>
 #include <core/error.h>
 #include <core/debug.h>
-#include <core/memory.h>
 
 #define MAX_FRAMES 1024
 
