@@ -20,6 +20,8 @@ typedef uint64_t Value;
 #define MASK_TYPE_SPECIAL 0x0001000000000000
 #define MASK_TYPE_INTEGER 0x0002000000000000
 #define MASK_TYPE_STRING  0x0003000000000000
+#define MASK_TYPE_CLOSURE 0x0004000000000000
+#define MASK_TYPE_CLOSENV 0x0005000000000000
 
 // Constant short encoded values
 #define kNaN   (MASK_EXPONENT | MASK_QUIET)
@@ -30,6 +32,8 @@ typedef uint64_t Value;
 #define SIGNATURE_SPECIAL kNull
 #define SIGNATURE_INTEGER (kNaN | MASK_TYPE_INTEGER)
 #define SIGNATURE_STRING  (kNaN | MASK_TYPE_STRING)
+#define SIGNATURE_CLOSURE (kNaN | MASK_TYPE_CLOSURE)
+#define SIGNATURE_CLOSENV (kNaN | MASK_TYPE_CLOSENV)
 #define SIGNATURE_POINTER (kNaN | MASK_SIGN)
 
 typedef int32_t reg;
@@ -47,6 +51,8 @@ typedef enum {
   TYPE_LIST,
   TYPE_SPECIAL,
   TYPE_MUTABLE,
+  TYPE_CLOSURE,
+  TYPE_CLOSENV,
   TYPE_UNKNOWN,
 } ValueType;
 
@@ -75,6 +81,11 @@ typedef struct {
 #define MAKE_INTEGER(x) (SIGNATURE_INTEGER | (uint32_t) (x))
 #define MAKE_FLOAT(x) (*(Value*)(&(value)))
 #define MAKE_PTR(x) ( SIGNATURE_POINTER | (uint64_t) (x))
+
+typedef Value Closure[2];
+
+#define MAKE_CLOSURE(x, y) (SIGNATURE_CLOSURE | (uint64_t) (x) | ((uint64_t) (y) << 16))
+#define MAKE_CLOSENV(pc, sp, bp) (SIGNATURE_CLOSENV | (uint64_t) (pc) | ((uint64_t) (sp) << 16) | ((uint64_t) (bp) << 32))
 
 static inline Value MAKE_STRING(char* x, uint32_t len) {
   HeapValue* v = malloc(sizeof(HeapValue));
@@ -113,6 +124,10 @@ static inline Value MAKE_MUTABLE(Value x) {
 #define GET_FLOAT(x) (*(double*)(&(x)))
 #define GET_ADDRESS(x) GET_INT(x)
 #define GET_NATIVE(x) GET_STRING(x)
+#define GET_NTH_ELEMENT(x, n) ((x >> (n * 16)) & MASK_PAYLOAD_INT)
+
+#define IS_PTR(x) (((x) & MASK_SIGNATURE) == SIGNATURE_POINTER)
+#define IS_CLO(x) (((x) & MASK_SIGNATURE) == SIGNATURE_CLOSURE)
 
 static inline ValueType get_type(Value value) {
   uint64_t signature = value & MASK_SIGNATURE;
@@ -129,6 +144,8 @@ static inline ValueType get_type(Value value) {
     case SIGNATURE_NAN:     return TYPE_FLOAT;
     case SIGNATURE_SPECIAL: return TYPE_SPECIAL;
     case SIGNATURE_INTEGER: return TYPE_INTEGER;
+    case SIGNATURE_CLOSURE: return TYPE_CLOSURE;
+    case SIGNATURE_CLOSENV: return TYPE_CLOSENV;
   }
 
   return TYPE_UNKNOWN;

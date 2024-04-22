@@ -41,6 +41,9 @@ typedef enum {
   OP_IJumpElseRelCmp,
   OP_JumpElseRelCmpConst,
   OP_IJumpElseRelCmpConst,
+  OP_CallGlobal,
+  OP_CallNative,
+  OP_MakeAndStoreLambda,
 } Opcode;
 
 typedef struct {
