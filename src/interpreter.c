@@ -23,8 +23,7 @@ static inline Value compare_eq_int(Value a, Value b) {
 
 Value compare_eq(Value a, Value b) {
   ValueType a_type = get_type(a);
-  ValueType b_type = get_type(b);
-  ASSERT_FMT(a_type == b_type, "Cannot compare values of different types: %s and %s", type_of(a), type_of(b));
+  ASSERT_FMT(a_type == get_type(b), "Cannot compare values of different types: %s and %s", type_of(a), type_of(b));
 
   switch (a_type) {
     case TYPE_INTEGER:
@@ -55,35 +54,24 @@ Value compare_or(Value a, Value b) {
 }
 
 ComparisonFun comparison_table[] = { NULL, NULL, compare_eq, NULL, NULL, compare_and, compare_or };
-ComparisonFun icomparison_table[] = { NULL, NULL, compare_eq_int, NULL, NULL, compare_and, compare_or };
 
 void op_call(Module *module, int32_t *pc, Value callee, size_t argc) {
-  ASSERT(module->callstack < MAX_FRAMES, "Call stack overflow");
+  ASSERT_FMT(module->callstack < MAX_FRAMES, "Call stack overflow, reached %zu", module->callstack);
 
-  HeapValue* list = GET_PTR(callee);
-  ASSERT(list->length == 2, "Invalid lambda shape");
-
-  Value ipc = list->as_ptr[0];
-  Value local_space = list->as_ptr[1];
-
-  ValueType ipc_type = get_type(ipc);
-  ValueType local_space_type = get_type(local_space);
-
-  ASSERT(ipc_type == TYPE_INTEGER, "Invalid ipc type");
-  ASSERT(local_space_type == TYPE_INTEGER, "Invalid local space type");
+  int16_t ipc = (int16_t) (callee & MASK_PAYLOAD_INT);
+  int16_t local_space = (int16_t) ((callee >> 16) & MASK_PAYLOAD_INT);
 
   int32_t new_pc = *pc + 4;
-  size_t sp = create_frame(module, new_pc, argc);
+  create_frame(module, new_pc, local_space, argc);
 
-  *pc = GET_INT(ipc);
+  *pc = ipc;
 }
 
 void op_native_call(Module *module, int32_t *pc, Value callee, size_t argc) {
   char* fun = GET_NATIVE(callee);
 
   Value libIdx = stack_pop(module->stack);
-  ValueType libIdx_type = get_type(libIdx);
-  ASSERT_FMT(libIdx_type == TYPE_INTEGER,
+  ASSERT_FMT(get_type(libIdx) == TYPE_INTEGER,
               "Invalid library (for function %s) index", fun);
   int32_t lib_idx = GET_INT(libIdx);
   Value fun_name = stack_pop(module->stack);
@@ -119,7 +107,7 @@ void op_native_call(Module *module, int32_t *pc, Value callee, size_t argc) {
 
 typedef void (*InterpreterFunc)(Module*, int32_t*, Value, size_t);
 
-InterpreterFunc interpreter_table[] = { NULL, NULL, op_native_call, op_call };
+InterpreterFunc interpreter_table[] = { op_native_call, op_call };
 
 void run_interpreter(Deserialized des) {
   Module* module = des.module;
@@ -145,19 +133,23 @@ void run_interpreter(Deserialized des) {
     &&case_halt, &&case_update, &&case_make_mutable, &&case_unmut, 
     &&case_add, &&case_sub, &&case_return_const, &&case_add_const, 
     &&case_sub_const, &&case_jump_else_rel_cmp, UNKNOWN, UNKNOWN, 
-    &&case_ijump_else_rel_cmp_constant };
+    &&case_ijump_else_rel_cmp_constant, &&case_call_global,
+    &&case_call_local, &&case_make_and_store_lambda };
 
   goto *jmp_table[op];
 
   case_load_local: {
-    Value value = module->stack->values[module->base_pointer + 3 + i1];
+    size_t locals = module->base_pointer - module->locals[module->locals_count - 1];
+
+    Value value = module->stack->values[locals + i1];
     stack_push(module->stack, value);
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
 
   case_store_local: {
-    module->stack->values[module->base_pointer + 3 + i1] = stack_pop(module->stack);
+    size_t locals = module->base_pointer - module->locals[module->locals_count - 1];
+    module->stack->values[locals + i1] = stack_pop(module->stack);
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -186,12 +178,11 @@ void run_interpreter(Deserialized des) {
     Frame fr = pop_frame(module);
     Value ret = stack_pop(module->stack);
 
-    pc = fr.instruction_pointer;
     module->stack->stack_pointer = fr.stack_pointer;
     module->base_pointer = fr.base_ptr;
     stack_push(module->stack, ret);
 
-    module->callstack--;
+    pc = fr.instruction_pointer;
     goto *jmp_table[op];
   }
   
@@ -258,10 +249,9 @@ void run_interpreter(Deserialized des) {
   case_call: {
     Value callee = stack_pop(module->stack);
 
-    ValueType call_ty = get_type(callee);
-    ASSERT(call_ty == TYPE_STRING || call_ty == TYPE_LIST, "Invalid callee type");
-
-    interpreter_table[call_ty](module, &pc, callee, i1);
+    ASSERT(IS_CLO(callee) || IS_PTR(callee), "Invalid callee type");
+  
+    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_CLOSURE](module, &pc, callee, i1);
 
     goto *jmp_table[op];
   }
@@ -278,12 +268,9 @@ void run_interpreter(Deserialized des) {
   }
   
   case_make_lambda: {
-    Value* values = malloc(sizeof(Value) * 2);
     int32_t new_pc = pc + 4;
-    values[0] = MAKE_ADDRESS(new_pc);
-    values[1] = MAKE_INTEGER(i2);
+    Value lambda = MAKE_CLOSURE(new_pc, i2);
 
-    Value lambda = MAKE_LIST(values, 2);
     stack_push(module->stack, lambda);
     INCREASE_IP_BY(pc, i1 + 1);
 
@@ -297,7 +284,7 @@ void run_interpreter(Deserialized des) {
     ASSERT(get_type(index) == TYPE_INTEGER, "Invalid index type");
 
     HeapValue* l = GET_PTR(list);
-    ASSERT(index.as_int64 < l->length, "Index out of bounds");
+    ASSERT((int64_t) index < l->length, "Index out of bounds");
     stack_push(module->stack, l->as_ptr[index]);
     INCREASE_IP(pc);
     goto *jmp_table[op];
@@ -381,7 +368,7 @@ void run_interpreter(Deserialized des) {
   case_add: {
     Value a = stack_pop(module->stack);
     Value b = stack_pop(module->stack);
-    
+
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
     stack_push(module->stack, MAKE_INTEGER(a + b));
@@ -402,14 +389,12 @@ void run_interpreter(Deserialized des) {
 
   case_return_const: {
     Frame fr = pop_frame(module);
-    
     module->stack->stack_pointer = fr.stack_pointer;
     module->base_pointer = fr.base_ptr;
 
     stack_push(module->stack, module->constants[i1]);
 
     pc = fr.instruction_pointer;
-    module->callstack--;
 
     goto *jmp_table[op];
   }
@@ -456,15 +441,54 @@ void run_interpreter(Deserialized des) {
     Value b = module->constants[i3];
 
     ASSERT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers");
+    
+    void* icomparison_table[] = { 
+      UNKNOWN, UNKNOWN, &&icmp_eq, UNKNOWN, 
+      UNKNOWN, &&icmp_and, &&icmp_or };
 
-    Value cmp = icomparison_table[i2](a, b);
+    uint32_t res;
 
-    if (GET_INT(cmp) == 0) {
-      INCREASE_IP_BY(pc, i1);
-    } else {
-      INCREASE_IP(pc);
+    goto *icomparison_table[i2];
+
+    icmp_eq: { res = GET_INT(a) == GET_INT(b); goto next; }
+    icmp_and: { res = GET_INT(a) & GET_INT(b); goto next; }
+    icmp_or: { res = GET_INT(a) | GET_INT(b); goto next; }
+
+    next: {
+      INCREASE_IP_BY(pc, (uint32_t) res == 0 ? i1 : 1);
+      goto *jmp_table[op];
     }
+  }
 
+  case_call_global: {
+    Value callee = module->stack->values[i1];
+
+    ASSERT(IS_CLO(callee) || IS_PTR(callee), "Invalid callee type");
+  
+    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_CLOSURE](module, &pc, callee, i2);
+
+    goto *jmp_table[op];
+  }
+
+  case_call_local: {
+    size_t locals = module->base_pointer - module->locals[module->locals_count - 1];
+
+    Value callee = module->stack->values[locals + i1];
+
+    ASSERT(IS_CLO(callee) || IS_PTR(callee), "Invalid callee type");
+  
+    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_CLOSURE](module, &pc, callee, i1);
+
+    goto *jmp_table[op];
+  }
+
+  case_make_and_store_lambda: {
+    int32_t new_pc = pc + 4;
+    Value lambda = MAKE_CLOSURE(new_pc, i3);
+
+    module->stack->values[i1] = lambda;
+
+    INCREASE_IP_BY(pc, i2 + 1);
     goto *jmp_table[op];
   }
 

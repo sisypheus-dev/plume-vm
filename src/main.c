@@ -10,7 +10,10 @@
 #define PLUME_VERSION "0.0.1"
 
 int main(int argc, char** argv) {
+  #if DEBUG
   unsigned long long start = clock_gettime_nsec_np(CLOCK_MONOTONIC);
+  #endif
+  
   if (argc < 2) THROW_FMT("Usage: %s <file>\n", argv[0]);
   FILE* file = fopen(argv[1], "rb");
 
@@ -29,6 +32,8 @@ int main(int argc, char** argv) {
   des.module->argv = values;
   des.module->handles = malloc(des.libraries.num_libraries * sizeof(void*));
 
+  // TODO: Implement library loading in a flat manner
+  //       in order to avoid `calloc` calls in the loop.
   Libraries libs = des.libraries;
 
   for (int i = 0; i < des.libraries.num_libraries; i++) {
@@ -39,20 +44,25 @@ int main(int argc, char** argv) {
         calloc(lib.num_functions, sizeof(Native));
   }
 
+  #if DEBUG
   DEBUG_PRINTLN("Instruction count: %zu", des.instr_count);
-
   unsigned long long end = clock_gettime_nsec_np(CLOCK_MONOTONIC);
 
   // Get time in milliseconds
   unsigned long long time = (end - start) / 1000 / 1000;
-  printf("Deserialization took %lld ms\n", time);
+  DEBUG_PRINTLN("Deserialization took %lld ms", time);
 
   unsigned long long start_interp = clock_gettime_nsec_np(CLOCK_MONOTONIC);
+  #endif
+
   run_interpreter(des);
+
+  #if DEBUG
   unsigned long long end_interp = clock_gettime_nsec_np(CLOCK_MONOTONIC);
 
   unsigned long long interp_time = (end_interp - start_interp) / 1000 / 1000;
-  printf("Interpretation took %lld ms\n", interp_time);
+  DEBUG_PRINTLN("Interpretation took %lld ms", interp_time);
+  #endif
 
   return 0;
 }

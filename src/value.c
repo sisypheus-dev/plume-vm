@@ -8,6 +8,10 @@ char* type_of(Value value) {
   switch (get_type(value)) {
     case TYPE_INTEGER:
       return "integer";
+    case TYPE_CLOSURE: 
+      return "closure";
+    case TYPE_CLOSENV: 
+      return "closenv";
     case TYPE_FLOAT:
       return "float";
     case TYPE_STRING:
