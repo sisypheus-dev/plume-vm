@@ -251,7 +251,7 @@ void run_interpreter(Deserialized des) {
 
     ASSERT(IS_CLO(callee) || IS_PTR(callee), "Invalid callee type");
   
-    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_CLOSURE](module, &pc, callee, i1);
+    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, &pc, callee, i1);
 
     goto *jmp_table[op];
   }
@@ -269,7 +269,7 @@ void run_interpreter(Deserialized des) {
   
   case_make_lambda: {
     int32_t new_pc = pc + 4;
-    Value lambda = MAKE_CLOSURE(new_pc, i2);
+    Value lambda = MAKE_FUNCTION(new_pc, i2);
 
     stack_push(module->stack, lambda);
     INCREASE_IP_BY(pc, i1 + 1);
@@ -463,9 +463,9 @@ void run_interpreter(Deserialized des) {
   case_call_global: {
     Value callee = module->stack->values[i1];
 
-    ASSERT(IS_CLO(callee) || IS_PTR(callee), "Invalid callee type");
+    ASSERT(IS_FUN(callee) || IS_PTR(callee), "Invalid callee type");
   
-    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_CLOSURE](module, &pc, callee, i2);
+    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, &pc, callee, i2);
 
     goto *jmp_table[op];
   }
@@ -475,16 +475,16 @@ void run_interpreter(Deserialized des) {
 
     Value callee = module->stack->values[locals + i1];
 
-    ASSERT(IS_CLO(callee) || IS_PTR(callee), "Invalid callee type");
+    ASSERT(IS_FUN(callee) || IS_PTR(callee), "Invalid callee type");
   
-    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_CLOSURE](module, &pc, callee, i1);
+    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, &pc, callee, i1);
 
     goto *jmp_table[op];
   }
 
   case_make_and_store_lambda: {
     int32_t new_pc = pc + 4;
-    Value lambda = MAKE_CLOSURE(new_pc, i3);
+    Value lambda = MAKE_FUNCTION(new_pc, i3);
 
     module->stack->values[i1] = lambda;
 

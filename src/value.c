@@ -10,8 +10,10 @@ char* type_of(Value value) {
       return "integer";
     case TYPE_CLOSURE: 
       return "closure";
-    case TYPE_CLOSENV: 
-      return "closenv";
+    case TYPE_FUNCTION: 
+      return "function";
+    case TYPE_FUNCENV: 
+      return "function_env";
     case TYPE_FLOAT:
       return "float";
     case TYPE_STRING:

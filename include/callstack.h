@@ -28,7 +28,7 @@ static void create_frame(Module* mod, reg pc, int16_t num_locals, int16_t argc) 
   int16_t old_sp = mod->stack->stack_pointer - argc;
   
   Stack *stack = mod->stack;
-  stack_push(stack, MAKE_CLOSENV(pc, old_sp, mod->base_pointer));
+  stack_push(stack, MAKE_FUNCENV(pc, old_sp, mod->base_pointer));
   
   mod->base_pointer = stack->stack_pointer - 1;
   mod->locals[mod->locals_count++] = num_locals;
