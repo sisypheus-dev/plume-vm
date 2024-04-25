@@ -7,7 +7,25 @@
 #include <stdlib.h>
 #include <time.h>
 
+#ifdef _WIN32
+#define PATH_SEP '\\'
+#else
+#define PATH_SEP '/'
+#endif
+
 #define PLUME_VERSION "0.0.1"
+
+struct Env {
+  char* path;
+  uint8_t res;
+};
+
+static inline struct Env get_std_path() {
+  struct Env env;
+  env.path = getenv("PLUME_PATH");
+  env.res = env.path == NULL;
+  return env;
+}
 
 int main(int argc, char** argv) {
   #if DEBUG
@@ -32,6 +50,8 @@ int main(int argc, char** argv) {
   des.module->argv = values;
   des.module->handles = malloc(des.libraries.num_libraries * sizeof(void*));
 
+  struct Env res = get_std_path();
+
   // TODO: Implement library loading in a flat manner
   //       in order to avoid `calloc` calls in the loop.
   Libraries libs = des.libraries;
@@ -39,7 +59,16 @@ int main(int argc, char** argv) {
   for (int i = 0; i < des.libraries.num_libraries; i++) {
     Library lib = libs.libraries[i];
     char* path = lib.name;
-    des.module->handles[i] = load_library(path);
+
+    char* final_path = malloc((lib.is_standard ? strlen(res.path) + 1 : 0) + strlen(path) + 1);
+
+    if (lib.is_standard) {
+      sprintf(final_path, "%s%c%s", res.path, PATH_SEP, path);
+    } else {
+      strcpy(final_path, path);
+    }
+
+    des.module->handles[i] = load_library(final_path);
     des.module->natives[i].functions =
         calloc(lib.num_functions, sizeof(Native));
   }

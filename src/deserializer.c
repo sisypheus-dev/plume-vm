@@ -153,10 +153,14 @@ Libraries deserialize_libraries(FILE* file) {
 
     Library lib;
 
+    int32_t is_std;
+    fread(&is_std, sizeof(int32_t), 1, file);
+
     int32_t function_count;
     fread(&function_count, sizeof(int32_t), 1, file);
 
     lib.num_functions = function_count;
+    lib.is_standard = is_std;
     lib.name = library_name;
 
     libraries.libraries[i] = lib;

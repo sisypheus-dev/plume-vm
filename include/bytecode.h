@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 typedef enum {
   OP_LoadLocal,
@@ -61,6 +62,7 @@ typedef struct {
 typedef struct {
   char *name;
   size_t num_functions;
+  bool is_standard;
 } Library;
 
 typedef struct {
