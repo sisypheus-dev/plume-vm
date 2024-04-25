@@ -81,7 +81,7 @@ typedef struct {
 } HeapValue;
 
 #define MAKE_INTEGER(x) (SIGNATURE_INTEGER | (uint32_t) (x))
-#define MAKE_FLOAT(x) (*(Value*)(&(value)))
+#define MAKE_FLOAT(x) (*(Value*)(&(x)))
 #define MAKE_PTR(x) ( SIGNATURE_POINTER | (uint64_t) (x))
 
 typedef Value Closure[2];
