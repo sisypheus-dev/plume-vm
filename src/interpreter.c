@@ -134,7 +134,8 @@ void run_interpreter(Deserialized des) {
     &&case_add, &&case_sub, &&case_return_const, &&case_add_const, 
     &&case_sub_const, &&case_jump_else_rel_cmp, UNKNOWN, UNKNOWN, 
     &&case_ijump_else_rel_cmp_constant, &&case_call_global,
-    &&case_call_local, &&case_make_and_store_lambda };
+    &&case_call_local, &&case_make_and_store_lambda, &&case_mul,
+    &&case_mul_const };
 
   goto *jmp_table[op];
 
@@ -489,6 +490,28 @@ void run_interpreter(Deserialized des) {
     module->stack->values[i1] = lambda;
 
     INCREASE_IP_BY(pc, i2 + 1);
+    goto *jmp_table[op];
+  }
+
+  case_mul: {
+    Value a = stack_pop(module->stack);
+    Value b = stack_pop(module->stack);
+
+    ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
+
+    stack_push(module->stack, MAKE_INTEGER(a * b));
+    INCREASE_IP(pc);
+    goto *jmp_table[op];
+  }
+
+  case_mul_const: {
+    Value a = stack_pop(module->stack);
+    Value b = module->constants[i1];
+
+    ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
+
+    stack_push(module->stack, MAKE_INTEGER(a * b));
+    INCREASE_IP(pc);
     goto *jmp_table[op];
   }
 
