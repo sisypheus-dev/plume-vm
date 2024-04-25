@@ -1,3 +1,9 @@
+if is_plat("windows") then
+  set_toolchains("clang-cl")
+else 
+  set_toolchains("clang")
+end
+
 target("plume-vm")
   add_rules("mode.release")
   add_files("src/**.c")
