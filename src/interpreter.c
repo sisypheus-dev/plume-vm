@@ -382,7 +382,7 @@ void run_interpreter(Deserialized des) {
 
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
-    stack_push(module->stack, MAKE_INTEGER(a - b));
+    stack_push(module->stack, MAKE_INTEGER(b - a));
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
