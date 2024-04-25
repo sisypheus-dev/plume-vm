@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <value.h>
-#include <nanbox/nanbox.h>
 
 char* type_of(Value value) {
   switch (get_type(value)) {

@@ -2,7 +2,6 @@
 #define VALUE_H
 
 #include <stdint.h>
-#include <nanbox/nanbox.h>
 #include <stdlib.h>
 typedef uint64_t Value;
 
