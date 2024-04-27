@@ -53,7 +53,6 @@ typedef enum {
   TYPE_MUTABLE,
   TYPE_FUNCTION,
   TYPE_FUNCENV,
-  TYPE_CLOSURE,
   TYPE_UNKNOWN,
 } ValueType;
 
@@ -93,15 +92,6 @@ static inline Value MAKE_STRING(char* x, uint32_t len) {
   v->length = len;
   v->type = TYPE_STRING;
   v->as_string = x;
-  return MAKE_PTR(v);
-}
-
-static inline Value MAKE_CLOSURE(reg pc, reg bp) {
-  Closure clos = { pc, bp };
-  HeapValue* v = malloc(sizeof(HeapValue));
-  v->length = 2;
-  v->type = TYPE_CLOSURE;
-  v->as_ptr = clos;
   return MAKE_PTR(v);
 }
 
