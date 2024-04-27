@@ -38,6 +38,22 @@ Value compare_eq(Value a, Value b) {
 
       return MAKE_INTEGER(strcmp(a_ptr->as_string, b_ptr->as_string) == 0);
     }
+    case TYPE_FUNCTION: case TYPE_FUNCENV: case TYPE_MUTABLE: {
+      return MAKE_INTEGER(a == b);
+    }
+    case TYPE_LIST: {
+      HeapValue* a_ptr = GET_PTR(a);
+      HeapValue* b_ptr = GET_PTR(b);
+
+      if (a_ptr->length != b_ptr->length) return MAKE_INTEGER(0);
+
+      for (uint32_t i = 0; i < a_ptr->length; i++) {
+        if (!compare_eq(a_ptr->as_ptr[i], b_ptr->as_ptr[i])) return MAKE_INTEGER(0);
+      }
+
+      return MAKE_INTEGER(1);
+    }
+    case TYPE_SPECIAL: return MAKE_INTEGER(1);
     default: 
       THROW_FMT("Cannot compare values of type %s", type_of(a));
   }
@@ -127,12 +143,13 @@ void run_interpreter(Deserialized des) {
     &&case_load_global, &&case_store_global, &&case_return, 
     &&case_compare, &&case_and, &&case_or, &&case_load_native, 
     &&case_make_list, &&case_list_get, &&case_call, 
-    &&case_jump_else_rel, UNKNOWN, UNKNOWN, UNKNOWN,
+    &&case_jump_else_rel, &&case_type_of, UNKNOWN, UNKNOWN,
     &&case_make_lambda, &&case_get_index, 
     &&case_special, &&case_jump_rel, &&case_slice, &&case_list_length,
     &&case_halt, &&case_update, &&case_make_mutable, &&case_unmut, 
     &&case_add, &&case_sub, &&case_return_const, &&case_add_const, 
-    &&case_sub_const, &&case_jump_else_rel_cmp, UNKNOWN, UNKNOWN, 
+    &&case_sub_const, &&case_jump_else_rel_cmp, &&case_ijump_else_rel_cmp, 
+    &&case_jump_else_rel_cmp_constant, 
     &&case_ijump_else_rel_cmp_constant, &&case_call_global,
     &&case_call_local, &&case_make_and_store_lambda, &&case_mul,
     &&case_mul_const };
@@ -268,6 +285,13 @@ void run_interpreter(Deserialized des) {
     goto *jmp_table[op];
   }
   
+  case_type_of: {
+    Value value = stack_pop(module->stack);
+    stack_push(module->stack, MAKE_STRING(type_of(value), strlen(type_of(value))));
+    INCREASE_IP(pc);
+    goto *jmp_table[op];
+  }
+
   case_make_lambda: {
     int32_t new_pc = pc + 4;
     Value lambda = MAKE_FUNCTION(new_pc, i2);
@@ -437,6 +461,46 @@ void run_interpreter(Deserialized des) {
     goto *jmp_table[op];
   }
 
+  case_ijump_else_rel_cmp: {
+    Value a = stack_pop(module->stack);
+    Value b = stack_pop(module->stack);
+
+    void* icomparison_table[] = { 
+      UNKNOWN, UNKNOWN, &&icmp_eq, UNKNOWN, 
+      UNKNOWN, &&icmp_and, &&icmp_or };
+
+    uint32_t res;
+
+    goto *icomparison_table[i1];
+
+    icmp_eq: { res = GET_INT(a) == GET_INT(b); goto next; }
+    icmp_and: { res = GET_INT(a) & GET_INT(b); goto next; }
+    icmp_or: { res = GET_INT(a) | GET_INT(b); goto next; }
+
+    next: {
+      INCREASE_IP_BY(pc, (uint32_t) res == 0 ? i2 : 1);
+      goto *jmp_table[op];
+    }
+  }
+
+  case_jump_else_rel_cmp_constant: {
+    Value a = stack_pop(module->stack);
+    Value b = module->constants[i3];
+
+    ASSERT(get_type(a) == get_type(b), "Expected integers");
+    
+    Value cmp = compare_eq(a, b);
+    ASSERT(get_type(cmp) == TYPE_INTEGER, "Expected integer");
+
+    if (GET_INT(cmp) == 0) {
+      INCREASE_IP_BY(pc, i1);
+    } else {
+      INCREASE_IP(pc);
+    }
+
+    goto *jmp_table[op];
+  }
+
   case_ijump_else_rel_cmp_constant: {
     Value a = stack_pop(module->stack);
     Value b = module->constants[i3];
@@ -444,18 +508,18 @@ void run_interpreter(Deserialized des) {
     ASSERT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers");
     
     void* icomparison_table[] = { 
-      UNKNOWN, UNKNOWN, &&icmp_eq, UNKNOWN, 
-      UNKNOWN, &&icmp_and, &&icmp_or };
+      UNKNOWN, UNKNOWN, &&icmp_cst_eq, UNKNOWN, 
+      UNKNOWN, &&icmp_cst_and, &&icmp_cst_or };
 
     uint32_t res;
 
     goto *icomparison_table[i2];
 
-    icmp_eq: { res = GET_INT(a) == GET_INT(b); goto next; }
-    icmp_and: { res = GET_INT(a) & GET_INT(b); goto next; }
-    icmp_or: { res = GET_INT(a) | GET_INT(b); goto next; }
+    icmp_cst_eq: { res = GET_INT(a) == GET_INT(b); goto next_cst; }
+    icmp_cst_and: { res = GET_INT(a) & GET_INT(b); goto next_cst; }
+    icmp_cst_or: { res = GET_INT(a) | GET_INT(b); goto next_cst; }
 
-    next: {
+    next_cst: {
       INCREASE_IP_BY(pc, (uint32_t) res == 0 ? i1 : 1);
       goto *jmp_table[op];
     }
