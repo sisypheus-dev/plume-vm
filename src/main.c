@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
   }
 
 #if DEBUG
-  DEBUG_PRINTLN("Instruction count: %zu", des.instr_count);
+  DEBUG_PRINTLN("Instruction count: %d", des.instr_count);
   unsigned long long end = clock_gettime_nsec_np(CLOCK_MONOTONIC);
 
   // Get time in milliseconds

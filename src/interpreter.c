@@ -74,12 +74,13 @@ void op_call(Module *module, int32_t *pc, Value callee, int32_t argc) {
   int16_t local_space = (int16_t) ((callee >> 16) & MASK_PAYLOAD_INT);
   int16_t old_sp = module->stack->stack_pointer - argc;
 
+  module->stack->stack_pointer += local_space - argc;
+
   int32_t new_pc = *pc + 4;
 
   stack_push(module->stack, MAKE_FUNCENV(new_pc, old_sp, module->base_pointer));
   
   module->base_pointer = module->stack->stack_pointer - 1;
-  module->locals[module->locals_count++] = local_space;
   module->callstack++;
 
   *pc = ipc;
@@ -159,7 +160,7 @@ void run_interpreter(Deserialized des) {
   goto *jmp_table[op];
 
   case_load_local: {
-    int32_t locals = module->base_pointer - module->locals[module->locals_count - 1];
+    int32_t locals = module->base_pointer;
 
     Value value = module->stack->values[locals + i1];
     stack_push(module->stack, value);
@@ -168,7 +169,7 @@ void run_interpreter(Deserialized des) {
   }
 
   case_store_local: {
-    int32_t locals = module->base_pointer - module->locals[module->locals_count - 1];
+    int32_t locals = module->base_pointer;
     module->stack->values[locals + i1] = stack_pop(module->stack);
     INCREASE_IP(pc);
     goto *jmp_table[op];
@@ -538,7 +539,7 @@ void run_interpreter(Deserialized des) {
   }
 
   case_call_local: {
-    int32_t locals = module->base_pointer - module->locals[module->locals_count - 1];
+    int32_t locals = module->base_pointer;
 
     Value callee = module->stack->values[locals + i1];
 
