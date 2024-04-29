@@ -13,13 +13,15 @@
 #define INCREASE_IP_BY(pc, x) (pc += ((x) * 4))
 #define INCREASE_IP(pc) INCREASE_IP_BY(pc, 1)
 
+Constants constants;
+DLL* handles;
+
+int32_t plm_argc;
+Value* plm_argv;
+
 int halt = 0;
 
 typedef Value (*ComparisonFun)(Value, Value);
-
-static inline Value compare_eq_int(Value a, Value b) {
-  return MAKE_INTEGER(GET_INT(a) == GET_INT(b));
-}
 
 Value compare_eq(Value a, Value b) {
   ValueType a_type = get_type(a);
@@ -71,19 +73,25 @@ Value compare_or(Value a, Value b) {
 
 ComparisonFun comparison_table[] = { NULL, NULL, compare_eq, NULL, NULL, compare_and, compare_or };
 
-void op_call(Module *module, int32_t *pc, Value callee, size_t argc) {
-  ASSERT_FMT(module->callstack < MAX_FRAMES, "Call stack overflow, reached %zu", module->callstack);
+void op_call(Module *module, int32_t *pc, Value callee, int32_t argc) {
+  ASSERT_FMT(module->callstack < MAX_FRAMES, "Call stack overflow, reached %d", module->callstack);
 
   int16_t ipc = (int16_t) (callee & MASK_PAYLOAD_INT);
   int16_t local_space = (int16_t) ((callee >> 16) & MASK_PAYLOAD_INT);
+  int16_t old_sp = module->stack->stack_pointer - argc;
 
   int32_t new_pc = *pc + 4;
-  create_frame(module, new_pc, local_space, argc);
+
+  stack_push(module->stack, MAKE_FUNCENV(new_pc, old_sp, module->base_pointer));
+  
+  module->base_pointer = module->stack->stack_pointer - 1;
+  module->locals[module->locals_count++] = local_space;
+  module->callstack++;
 
   *pc = ipc;
 }
 
-void op_native_call(Module *module, int32_t *pc, Value callee, size_t argc) {
+void op_native_call(Module *module, int32_t *pc, Value callee, int32_t argc) {
   char* fun = GET_NATIVE(callee);
 
   Value libIdx = stack_pop(module->stack);
@@ -99,7 +107,7 @@ void op_native_call(Module *module, int32_t *pc, Value callee, size_t argc) {
               "Library not loaded (for function %s)", fun);
 
   if (module->natives[lib_name].functions[lib_idx] == NULL) {
-    void* lib = module->handles[lib_name];
+    void* lib = handles[lib_name];
     ASSERT_FMT(lib != NULL, "Library with function %s not loaded", fun);
     Native nfun = get_proc_address(lib, fun);
     ASSERT_FMT(nfun != NULL, "Native function %s not found", fun);
@@ -121,14 +129,13 @@ void op_native_call(Module *module, int32_t *pc, Value callee, size_t argc) {
   *pc += 4;
 }
 
-typedef void (*InterpreterFunc)(Module*, int32_t*, Value, size_t);
+typedef void (*InterpreterFunc)(Module*, int32_t*, Value, int32_t);
 
 InterpreterFunc interpreter_table[] = { op_native_call, op_call };
 
 void run_interpreter(Deserialized des) {
   Module* module = des.module;
   int32_t* bytecode = des.instrs;
-  int counter = 0;
   int32_t pc = 0;
 
   #define op bytecode[pc]
@@ -157,7 +164,7 @@ void run_interpreter(Deserialized des) {
   goto *jmp_table[op];
 
   case_load_local: {
-    size_t locals = module->base_pointer - module->locals[module->locals_count - 1];
+    int32_t locals = module->base_pointer - module->locals[module->locals_count - 1];
 
     Value value = module->stack->values[locals + i1];
     stack_push(module->stack, value);
@@ -166,14 +173,14 @@ void run_interpreter(Deserialized des) {
   }
 
   case_store_local: {
-    size_t locals = module->base_pointer - module->locals[module->locals_count - 1];
+    int32_t locals = module->base_pointer - module->locals[module->locals_count - 1];
     module->stack->values[locals + i1] = stack_pop(module->stack);
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
 
   case_load_constant: {
-    Value value = module->constants[i1];
+    Value value = constants[i1];
     stack_push(module->stack, value);
     INCREASE_IP(pc);
     goto *jmp_table[op];
@@ -236,7 +243,7 @@ void run_interpreter(Deserialized des) {
   }
 
   case_load_native: {
-    Value name = module->constants[i1];
+    Value name = constants[i1];
     ASSERT(get_type(name) == TYPE_STRING, "Invalid native function name type");
     stack_push(module->stack, MAKE_INTEGER(i2));
     stack_push(module->stack, MAKE_INTEGER(i3));
@@ -258,7 +265,7 @@ void run_interpreter(Deserialized des) {
     Value list = stack_pop(module->stack);
     ASSERT(get_type(list) == TYPE_LIST, "Invalid list type");
     HeapValue* l = GET_PTR(list);
-    ASSERT(i1 < l->length, "Index out of bounds");
+    ASSERT((uint32_t) i1 < l->length, "Index out of bounds");
     stack_push(module->stack, l->as_ptr[i1]);
     INCREASE_IP(pc);
     goto *jmp_table[op];
@@ -267,7 +274,7 @@ void run_interpreter(Deserialized des) {
   case_call: {
     Value callee = stack_pop(module->stack);
 
-    ASSERT(IS_CLO(callee) || IS_PTR(callee), "Invalid callee type");
+    ASSERT(IS_FUN(callee) || IS_PTR(callee), "Invalid callee type");
   
     interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, &pc, callee, i1);
 
@@ -417,7 +424,7 @@ void run_interpreter(Deserialized des) {
     module->stack->stack_pointer = fr.stack_pointer;
     module->base_pointer = fr.base_ptr;
 
-    stack_push(module->stack, module->constants[i1]);
+    stack_push(module->stack, constants[i1]);
 
     pc = fr.instruction_pointer;
 
@@ -426,7 +433,7 @@ void run_interpreter(Deserialized des) {
 
   case_add_const: {
     Value a = stack_pop(module->stack);
-    Value b = module->constants[i1];
+    Value b = constants[i1];
 
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
@@ -437,7 +444,7 @@ void run_interpreter(Deserialized des) {
 
   case_sub_const: {
     Value a = stack_pop(module->stack);
-    Value b = module->constants[i1];
+    Value b = constants[i1];
 
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
     stack_push(module->stack, MAKE_INTEGER(a - b));
@@ -485,7 +492,7 @@ void run_interpreter(Deserialized des) {
 
   case_jump_else_rel_cmp_constant: {
     Value a = stack_pop(module->stack);
-    Value b = module->constants[i3];
+    Value b = constants[i3];
 
     ASSERT(get_type(a) == get_type(b), "Expected integers");
     
@@ -503,7 +510,7 @@ void run_interpreter(Deserialized des) {
 
   case_ijump_else_rel_cmp_constant: {
     Value a = stack_pop(module->stack);
-    Value b = module->constants[i3];
+    Value b = constants[i3];
 
     ASSERT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers");
     
@@ -536,7 +543,7 @@ void run_interpreter(Deserialized des) {
   }
 
   case_call_local: {
-    size_t locals = module->base_pointer - module->locals[module->locals_count - 1];
+    int32_t locals = module->base_pointer - module->locals[module->locals_count - 1];
 
     Value callee = module->stack->values[locals + i1];
 
@@ -570,7 +577,7 @@ void run_interpreter(Deserialized des) {
 
   case_mul_const: {
     Value a = stack_pop(module->stack);
-    Value b = module->constants[i1];
+    Value b = constants[i1];
 
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 

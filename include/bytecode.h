@@ -61,13 +61,13 @@ typedef struct {
 
 typedef struct {
   char *name;
-  size_t num_functions;
+  int32_t num_functions;
   bool is_standard;
 } Library;
 
 typedef struct {
   Library *libraries;
-  size_t num_libraries;
+  int32_t num_libraries;
 } Libraries;
 
 typedef enum {

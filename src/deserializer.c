@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <value.h>
+#include <interpreter.h>
 
 Instruction deserialize_instruction(FILE* file) {
   Instruction instr;
@@ -67,7 +68,7 @@ Bytecode deserialize_bytecode(FILE* file) {
   fread(&instruction_count, sizeof(int32_t), 1, file);
 
   Instruction* instructions = malloc(instruction_count * sizeof(Instruction));
-  for (size_t i = 0; i < instruction_count; i++) {
+  for (int32_t i = 0; i < instruction_count; i++) {
     instructions[i] = deserialize_instruction(file);
   }
 
@@ -125,7 +126,7 @@ Constants deserialize_constants(FILE* file) {
   fread(&constant_count, sizeof(int32_t), 1, file);
 
   constants = malloc(constant_count * sizeof(Value));
-  for (size_t i = 0; i < constant_count; i++) {
+  for (int32_t i = 0; i < constant_count; i++) {
     constants[i] = deserialize_value(file);
   }
 
@@ -143,7 +144,7 @@ Libraries deserialize_libraries(FILE* file) {
   libraries.num_libraries = library_count;
   libraries.libraries = malloc(library_count * sizeof(Library));
 
-  for (size_t i = 0; i < library_count; i++) {
+  for (int32_t i = 0; i < library_count; i++) {
     int32_t length;
     fread(&length, sizeof(int32_t), 1, file);
 
@@ -174,20 +175,20 @@ Libraries deserialize_libraries(FILE* file) {
 Deserialized deserialize(FILE* file) {
   Module* module = malloc(sizeof(Module));
 
-  Constants constants = deserialize_constants(file);
+  Constants constants_ = deserialize_constants(file);
   Libraries libraries = deserialize_libraries(file);
 
-  size_t instr_count;
+  int32_t instr_count;
   fread(&instr_count, sizeof(int32_t), 1, file);
 
   int32_t* instrs = malloc(instr_count * 4 * sizeof(int32_t));
   fread(instrs, sizeof(int32_t), instr_count * 4, file);
 
-  module->constants = constants;
+  constants = constants_;
   module->stack = stack_new();
   module->callstack = 0;
   module->locals_count = 0;
-  module->locals = malloc(MAX_FRAMES * sizeof(size_t));
+  module->locals = malloc(MAX_FRAMES * sizeof(int32_t));
   module->natives = calloc(libraries.num_libraries, sizeof(Native));
 
   Deserialized deserialized;

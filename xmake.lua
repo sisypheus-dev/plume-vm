@@ -4,6 +4,8 @@ else
   set_toolchains("clang")
 end
 
+set_warnings("allextra")
+
 target("plume-vm")
   add_rules("mode.release")
   add_files("src/**.c")

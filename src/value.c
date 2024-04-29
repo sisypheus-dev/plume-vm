@@ -62,7 +62,7 @@ Value equal(Value x, Value y) {
       Value* x_values = x_heap->as_ptr;
       Value* y_values = y_heap->as_ptr;
 
-      for (int i = 0; i < x_heap->length; i++) {
+      for (uint32_t i = 0; i < x_heap->length; i++) {
         if ((int32_t) !equal(x_values[i], y_values[i])) {
           return MAKE_INTEGER(0);
         }
@@ -96,7 +96,11 @@ void native_print(Value value) {
     case TYPE_LIST: {
       HeapValue* list = GET_PTR(value);
       printf("[");
-      for (int i = 0; i < list->length; i++) {
+      if (list->length == 0) {
+        printf("]");
+        break;
+      }
+      for (uint32_t i = 0; i < list->length; i++) {
         native_print(list->as_ptr[i]);
         if (i < list->length - 1) {
           printf(", ");
