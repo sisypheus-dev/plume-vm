@@ -56,6 +56,10 @@ Value equal(Value x, Value y) {
 }
 
 void native_print(Value value) {
+  if (value == 0) {
+    printf("null");
+    return;
+  }
   ValueType val_type = get_type(value);
   switch (val_type) {
     case TYPE_INTEGER:
@@ -90,6 +94,14 @@ void native_print(Value value) {
       printf("<mutable ");
       native_print(GET_MUTABLE(value));
       printf(">");
+      break;
+    }
+    case TYPE_FUNCTION: {
+      printf("<function>");
+      break;
+    }
+    case TYPE_FUNCENV: {
+      printf("<funcenv>");
       break;
     }
     case TYPE_UNKNOWN: default: {

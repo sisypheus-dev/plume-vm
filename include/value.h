@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 typedef uint64_t Value;
 
 // Masks for important segments of a float value
@@ -21,7 +22,6 @@ typedef uint64_t Value;
 #define MASK_TYPE_STRING   0x0003000000000000
 #define MASK_TYPE_FUNCTION 0x0004000000000000
 #define MASK_TYPE_FUNCENV  0x0005000000000000
-#define MASK_TYPE_CLOSURE  0x0006000000000000
 
 // Constant short encoded values
 #define kNaN   (MASK_EXPONENT | MASK_QUIET)
@@ -32,7 +32,7 @@ typedef uint64_t Value;
 #define SIGNATURE_SPECIAL  kNull
 #define SIGNATURE_INTEGER  (kNaN | MASK_TYPE_INTEGER)
 #define SIGNATURE_STRING   (kNaN | MASK_TYPE_STRING)
-#define SIGNATURE_FUNCTION (kNaN | MASK_TYPE_CLOSURE)
+#define SIGNATURE_FUNCTION (kNaN | MASK_TYPE_FUNCTION)
 #define SIGNATURE_FUNCENV  (kNaN | MASK_TYPE_FUNCENV)
 #define SIGNATURE_POINTER  (kNaN | MASK_SIGN)
 
@@ -83,7 +83,7 @@ typedef struct {
 
 typedef Value Closure[2];
 
-#define MAKE_FUNCTION(x, y) (SIGNATURE_FUNCTION | (uint64_t) (x) | ((uint64_t) (y) << 16))
+#define MAKE_FUNCTION(x, y) (SIGNATURE_FUNCTION | (uint16_t) (x) | ((uint16_t) (y) << 16))
 #define MAKE_FUNCENV(pc, sp, bp) (SIGNATURE_FUNCENV | (uint64_t) (pc) | ((uint64_t) (sp) << 16) | ((uint64_t) (bp) << 32))
 
 static inline Value MAKE_STRING(char* x, uint32_t len) {
@@ -140,7 +140,7 @@ static inline ValueType get_type(Value value) {
 
   // Short encoded types
   switch (signature) {
-    case SIGNATURE_NAN:      return TYPE_FLOAT;
+    case SIGNATURE_NAN:      return TYPE_UNKNOWN;
     case SIGNATURE_SPECIAL:  return TYPE_SPECIAL;
     case SIGNATURE_INTEGER:  return TYPE_INTEGER;
     case SIGNATURE_FUNCTION: return TYPE_FUNCTION;
