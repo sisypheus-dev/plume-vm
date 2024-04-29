@@ -184,7 +184,7 @@ Deserialized deserialize(FILE* file) {
   int32_t* instrs = malloc(instr_count * 4 * sizeof(int32_t));
   fread(instrs, sizeof(int32_t), instr_count * 4, file);
 
-  constants = constants_;
+  module->constants = constants_;
   module->stack = stack_new();
   module->callstack = 0;
   module->locals_count = 0;

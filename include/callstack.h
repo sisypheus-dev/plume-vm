@@ -6,6 +6,7 @@
 #include <module.h>
 #include <core/error.h>
 #include <core/debug.h>
+#include <stdio.h>
 
 #define MAX_FRAMES 1024
 
@@ -27,7 +28,7 @@ void callstack_free(CallStack *callstack);
 static inline Frame pop_frame(Module* mod) {
   Value clos_env = mod->stack->values[mod->base_pointer];
 
-  ASSERT_FMT(get_type(clos_env) == TYPE_CLOSENV, "Expected closure environment got %s", type_of(clos_env));
+  ASSERT_FMT(get_type(clos_env) == TYPE_FUNCENV, "Expected closure environment got %s", type_of(clos_env));
 
   reg pc = (int16_t) GET_NTH_ELEMENT(clos_env, 0);
   size_t old_sp = (int16_t) GET_NTH_ELEMENT(clos_env, 1);

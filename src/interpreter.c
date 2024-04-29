@@ -13,12 +13,6 @@
 #define INCREASE_IP_BY(pc, x) (pc += ((x) * 4))
 #define INCREASE_IP(pc) INCREASE_IP_BY(pc, 1)
 
-Constants constants;
-DLL* handles;
-
-int32_t plm_argc;
-Value* plm_argv;
-
 int halt = 0;
 
 typedef Value (*ComparisonFun)(Value, Value);
@@ -107,7 +101,7 @@ void op_native_call(Module *module, int32_t *pc, Value callee, int32_t argc) {
               "Library not loaded (for function %s)", fun);
 
   if (module->natives[lib_name].functions[lib_idx] == NULL) {
-    void* lib = handles[lib_name];
+    void* lib = module->handles[lib_name];
     ASSERT_FMT(lib != NULL, "Library with function %s not loaded", fun);
     Native nfun = get_proc_address(lib, fun);
     ASSERT_FMT(nfun != NULL, "Native function %s not found", fun);
@@ -135,6 +129,7 @@ InterpreterFunc interpreter_table[] = { op_native_call, op_call };
 
 void run_interpreter(Deserialized des) {
   Module* module = des.module;
+  Constants constants = module->constants;
   int32_t* bytecode = des.instrs;
   int32_t pc = 0;
 

@@ -13,10 +13,15 @@ typedef struct Module {
   int32_t base_pointer;
   int32_t callstack;
 
+  Constants constants;
   Stack *stack;
   struct {
     Value (**functions)(int argc, struct Module *m, Value *args);
   } *natives;
+  DLL* handles;
+
+  int32_t argc;
+  Value *argv;
 
   int32_t *locals;
   int32_t locals_count;

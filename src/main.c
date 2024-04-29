@@ -65,9 +65,9 @@ int main(int argc, char** argv) {
 
   fclose(file);
 
-  plm_argc = argc;
-  plm_argv = values;
-  handles = malloc(des.libraries.num_libraries * sizeof(void*));
+  des.module->argc = argc;
+  des.module->argv = values;
+  des.module->handles = malloc(des.libraries.num_libraries * sizeof(void*));
 
   struct Env res = get_std_path();
 
@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
       strcpy(final_path, path);
     }
 
-    handles[i] = load_library(final_path);
+    des.module->handles[i] = load_library(final_path);
     des.module->natives[i].functions =
         calloc(lib.num_functions, sizeof(Native));
   }
