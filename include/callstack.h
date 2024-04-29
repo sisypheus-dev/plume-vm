@@ -34,7 +34,6 @@ static inline Frame pop_frame(Module* mod) {
   size_t old_sp = (int16_t) GET_NTH_ELEMENT(clos_env, 1);
   size_t base_ptr = (int16_t) GET_NTH_ELEMENT(clos_env, 2);
 
-  mod->locals_count--;
   mod->callstack--;
 
   return (Frame) { pc, old_sp, base_ptr };

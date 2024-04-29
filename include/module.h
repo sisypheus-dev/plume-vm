@@ -22,9 +22,6 @@ typedef struct Module {
 
   int32_t argc;
   Value *argv;
-
-  int32_t *locals;
-  int32_t locals_count;
 } Module;
 
 typedef Value (*Native)(int argc, Module *m, Value *args);

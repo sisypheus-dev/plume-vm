@@ -187,8 +187,6 @@ Deserialized deserialize(FILE* file) {
   module->constants = constants_;
   module->stack = stack_new();
   module->callstack = 0;
-  module->locals_count = 0;
-  module->locals = malloc(MAX_FRAMES * sizeof(int32_t));
   module->natives = calloc(libraries.num_libraries, sizeof(Native));
 
   Deserialized deserialized;
