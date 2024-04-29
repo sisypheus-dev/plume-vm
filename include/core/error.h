@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 
-#define ENABLE_ASSERTIONS 1
+#define ENABLE_ASSERTIONS 0
 
 #define THROW(message)                       \
   do {                                       \
