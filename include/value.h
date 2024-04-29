@@ -38,7 +38,6 @@ typedef uint64_t Value;
 
 typedef int32_t reg;
 
-char *type_of(Value v);
 Value equal(Value x, Value y);
 char *constructor_name(Value x);
 void native_print(Value value);
