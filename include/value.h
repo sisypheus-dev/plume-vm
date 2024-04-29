@@ -151,4 +151,27 @@ static inline ValueType get_type(Value value) {
   return TYPE_UNKNOWN;
 }
 
+static inline char* type_of(Value value) {
+  switch (get_type(value)) {
+    case TYPE_INTEGER:
+      return "integer";
+    case TYPE_FUNCTION: 
+      return "function";
+    case TYPE_FUNCENV: 
+      return "function_env";
+    case TYPE_FLOAT:
+      return "float";
+    case TYPE_STRING:
+      return "string";
+    case TYPE_LIST:
+      return "list";
+    case TYPE_SPECIAL:
+      return "special";
+    case TYPE_MUTABLE:
+      return "mutable";
+    case TYPE_UNKNOWN:
+      return "unknown";
+  }
+}
+
 #endif  // VALUE_H
