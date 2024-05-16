@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 
-#define ENABLE_ASSERTIONS 0
+#define ENABLE_ASSERTIONS 1
 
 #define THROW(message)                       \
   do {                                       \
@@ -16,6 +16,7 @@
 #define THROW_FMT(...)   \
   do {                   \
     printf(__VA_ARGS__); \
+    printf(" at %s:%d", __FILE__, __LINE__); \
     printf("\n");        \
     exit(EXIT_FAILURE);  \
   } while (0);

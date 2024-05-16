@@ -65,7 +65,12 @@ Value compare_or(Value a, Value b) {
   return MAKE_INTEGER(GET_INT(a) || GET_INT(b));
 }
 
-ComparisonFun comparison_table[] = { NULL, NULL, compare_eq, NULL, NULL, compare_and, compare_or };
+Value compare_gt(Value a, Value b) {
+  ASSERT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers");
+  return MAKE_INTEGER(GET_INT(a) > GET_INT(b));
+}
+
+ComparisonFun comparison_table[] = { NULL, compare_gt, compare_eq, NULL, NULL, compare_and, compare_or };
 
 void op_call(Module *module, int32_t *pc, Value callee, int32_t argc) {
   ASSERT_FMT(module->callstack < MAX_FRAMES, "Call stack overflow, reached %d", module->callstack);
@@ -102,6 +107,9 @@ void op_native_call(Module *module, int32_t *pc, Value callee, int32_t argc) {
               "Library not loaded (for function %s)", fun);
 
   if (module->natives[lib_name].functions[lib_idx] == NULL) {
+    if (module->handles == NULL || module->handles[lib_name] == NULL) {
+      THROW_FMT("Library %d not loaded", lib_name);
+    }
     void* lib = module->handles[lib_name];
     ASSERT_FMT(lib != NULL, "Library with function %s not loaded", fun);
     Native nfun = get_proc_address(lib, fun);
@@ -211,7 +219,7 @@ void run_interpreter(Deserialized des) {
     Value a = stack_pop(module->stack);
     Value b = stack_pop(module->stack);
 
-    stack_push(module->stack, comparison_table[i1](a, b));
+    stack_push(module->stack, comparison_table[i1](b, a));
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -259,10 +267,11 @@ void run_interpreter(Deserialized des) {
   
   case_list_get: {
     Value list = stack_pop(module->stack);
-    ASSERT(get_type(list) == TYPE_LIST, "Invalid list type");
+    uint32_t idx = GET_INT(i1);
+    ASSERT_FMT(get_type(list) == TYPE_LIST, "Invalid list type at IPC %d", pc / 4);
     HeapValue* l = GET_PTR(list);
-    ASSERT((uint32_t) i1 < l->length, "Index out of bounds");
-    stack_push(module->stack, l->as_ptr[i1]);
+    ASSERT(idx < l->length, "Index out of bounds");
+    stack_push(module->stack, l->as_ptr[idx]);
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -312,8 +321,10 @@ void run_interpreter(Deserialized des) {
     ASSERT(get_type(index) == TYPE_INTEGER, "Invalid index type");
 
     HeapValue* l = GET_PTR(list);
-    ASSERT((int64_t) index < l->length, "Index out of bounds");
-    stack_push(module->stack, l->as_ptr[index]);
+    uint32_t idx = GET_INT(index);
+  
+    ASSERT(idx < l->length, "Index out of bounds");
+    stack_push(module->stack, l->as_ptr[idx]);
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -347,7 +358,7 @@ void run_interpreter(Deserialized des) {
 
   case_list_length: {
     Value list = stack_pop(module->stack);
-    ASSERT(get_type(list) == TYPE_LIST, "Invalid list type");
+    ASSERT_FMT(get_type(list) == TYPE_LIST, "Invalid list type at IPC %d", pc / 4);
     HeapValue* l = GET_PTR(list);
     stack_push(module->stack, MAKE_INTEGER(l->length));
     INCREASE_IP(pc);
@@ -509,16 +520,21 @@ void run_interpreter(Deserialized des) {
     Value b = constants[i3];
 
     ASSERT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers");
-    
+
     void* icomparison_table[] = { 
-      UNKNOWN, UNKNOWN, &&icmp_cst_eq, UNKNOWN, 
-      UNKNOWN, &&icmp_cst_and, &&icmp_cst_or };
+      &&icmp_cst_lt, &&icmp_cst_gt, &&icmp_cst_eq, &&icmp_cst_neq, 
+      &&icmp_cst_lte, &&icmp_cst_gte, &&icmp_cst_and, &&icmp_cst_or };
 
     uint32_t res;
 
     goto *icomparison_table[i2];
 
+    icmp_cst_lt: { res = GET_INT(a) < GET_INT(b); goto next_cst; }
+    icmp_cst_gt: { res = GET_INT(a) > GET_INT(b); goto next_cst; }
     icmp_cst_eq: { res = GET_INT(a) == GET_INT(b); goto next_cst; }
+    icmp_cst_neq: { res = GET_INT(a) != GET_INT(b); goto next_cst; }
+    icmp_cst_gte: { res = GET_INT(a) >= GET_INT(b); goto next_cst; }
+    icmp_cst_lte: { res = GET_INT(a) <= GET_INT(b); goto next_cst; }
     icmp_cst_and: { res = GET_INT(a) & GET_INT(b); goto next_cst; }
     icmp_cst_or: { res = GET_INT(a) | GET_INT(b); goto next_cst; }
 
@@ -545,7 +561,7 @@ void run_interpreter(Deserialized des) {
 
     ASSERT(IS_FUN(callee) || IS_PTR(callee), "Invalid callee type");
   
-    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, &pc, callee, i1);
+    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, &pc, callee, i2);
 
     goto *jmp_table[op];
   }
