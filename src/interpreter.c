@@ -163,7 +163,7 @@ void run_interpreter(Deserialized des) {
     &&case_jump_else_rel_cmp_constant, 
     &&case_ijump_else_rel_cmp_constant, &&case_call_global,
     &&case_call_local, &&case_make_and_store_lambda, &&case_mul,
-    &&case_mul_const };
+    &&case_mul_const, &&case_return_unit };
 
   goto *jmp_table[op];
 
@@ -595,6 +595,23 @@ void run_interpreter(Deserialized des) {
 
     stack_push(module->stack, MAKE_INTEGER(a * b));
     INCREASE_IP(pc);
+    goto *jmp_table[op];
+  }
+
+  case_return_unit: {
+    Frame fr = pop_frame(module);
+    module->stack->stack_pointer = fr.stack_pointer;
+    module->base_pointer = fr.base_ptr;
+
+    Value* values = malloc(sizeof(Value) * 3);
+    values[0] = MAKE_SPECIAL();
+    values[1] = MAKE_STRING("unit", 4);
+    values[2] = MAKE_STRING("unit", 4);
+
+    stack_push(module->stack, MAKE_LIST(values, 3));
+
+    pc = fr.instruction_pointer;
+
     goto *jmp_table[op];
   }
 
