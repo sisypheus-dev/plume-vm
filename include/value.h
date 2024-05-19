@@ -70,6 +70,7 @@ typedef struct {
 typedef struct {
   ValueType type;
   uint32_t length;
+  uint8_t refcount;
 
   union {
     char* as_string;
@@ -91,6 +92,7 @@ static inline Value MAKE_STRING(char* x, uint32_t len) {
   v->length = len;
   v->type = TYPE_STRING;
   v->as_string = x;
+  v->refcount = 0;
   return MAKE_PTR(v);
 }
 
@@ -99,6 +101,7 @@ static inline Value MAKE_LIST(Value* x, uint32_t len) {
   v->length = len;
   v->type = TYPE_LIST;
   v->as_ptr = x;
+  v->refcount = 0;
   return MAKE_PTR(v);
 }
 
@@ -107,6 +110,7 @@ static inline Value MAKE_MUTABLE(Value x) {
   v->length = 1;
   v->type = TYPE_MUTABLE;
   v->as_ptr = &x;
+  v->refcount = 0;
   return MAKE_PTR(v);
 }
 
