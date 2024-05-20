@@ -7,13 +7,22 @@
 #include <stdlib.h>
 #include <time.h>
 
-#ifdef _WIN32
-#define PATH_SEP '\\'
-#else
-#define PATH_SEP '/'
-#endif
+#if defined(_WIN32)
+  #include <direct.h>
+  #define GetCurrentDir _getcwd
+  #define PATH_SEP '\\'
 
-#define PLUME_VERSION "0.0.1"
+  #include <shlwapi.h>
+  #define GetDirname(x) PathRemoveFileSpec(x)
+#else
+  #include <sys/stat.h>
+  #include <unistd.h>
+  #include <libgen.h>
+  #define GetCurrentDir getcwd
+  #define PATH_SEP '/'
+
+  #define GetDirname(x) dirname(x)
+#endif
 
 enum { BigEndian, LittleEndian };
 
@@ -55,6 +64,10 @@ int main(int argc, char** argv) {
 
   if (file == NULL) THROW_FMT("Could not open file: %s\n", argv[1]);
 
+  char* filename = strdup(argv[1]);
+  char* dir = GetDirname(filename);
+  size_t len = strlen(dir);
+
   int endianness_check = endianness();
 
   if (endianness_check != LittleEndian) {
@@ -75,7 +88,7 @@ int main(int argc, char** argv) {
   //       in order to avoid `calloc` calls in the loop.
   Libraries libs = des.libraries;
 
-  for (int32_t i = 0; i < des.libraries.num_libraries; i++) {
+  for (int i = 0; i < des.libraries.num_libraries; i++) {
     Library lib = libs.libraries[i];
     char* path = lib.name;
 
@@ -84,12 +97,12 @@ int main(int argc, char** argv) {
     }
 
     char* final_path =
-        malloc((lib.is_standard ? res.path_len + 1 : 0) + strlen(path) + 1);
+        malloc((lib.is_standard ? res.path_len + 1 : len + 1) + strlen(path) + 1);
 
     if (lib.is_standard && res.res == 0) {
       sprintf(final_path, "%s%c%s", res.path, PATH_SEP, path);
     } else {
-      strcpy(final_path, path);
+      sprintf(final_path, "%s%c%s", dir, PATH_SEP, path);
     }
 
     des.module->handles[i] = load_library(final_path);

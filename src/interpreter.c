@@ -107,9 +107,6 @@ void op_native_call(Module *module, int32_t *pc, Value callee, int32_t argc) {
               "Library not loaded (for function %s)", fun);
 
   if (module->natives[lib_name].functions[lib_idx] == NULL) {
-    if (module->handles == NULL || module->handles[lib_name] == NULL) {
-      THROW_FMT("Library %d not loaded", lib_name);
-    }
     void* lib = module->handles[lib_name];
     ASSERT_FMT(lib != NULL, "Library with function %s not loaded", fun);
     Native nfun = get_proc_address(lib, fun);
