@@ -30,7 +30,10 @@ Value compare_eq(Value a, Value b) {
       HeapValue* a_ptr = GET_PTR(a);
       HeapValue* b_ptr = GET_PTR(b);
 
-      if (a_ptr->length != b_ptr->length) return MAKE_INTEGER(0);
+      size_t a_len = strlen(a_ptr->as_string);
+      size_t b_len = strlen(b_ptr->as_string);
+
+      if (a_len != b_len) return MAKE_INTEGER(0);
 
       return MAKE_INTEGER(strcmp(a_ptr->as_string, b_ptr->as_string) == 0);
     }
