@@ -38,3 +38,5 @@ _*
 /vsxmake*/
 /.vs/
 /*/.vs/
+
+*.plmc
