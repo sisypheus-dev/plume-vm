@@ -19,7 +19,7 @@ char* GetDirname(char* path);
 
   char* GetDirname(char* path) {
     char* dir = strdup(path);
-    PathCchRemoveFileSpec(dir, strlen(dir));
+    PathRemoveFileSpec(dir);
     return dir;
   }
 #else
