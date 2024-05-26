@@ -7,13 +7,19 @@
 #include <stdlib.h>
 #include <time.h>
 
+char* GetDirname(char* path);
+
 #if defined(_WIN32)
   #include <direct.h>
   #define GetCurrentDir _getcwd
   #define PATH_SEP '\\'
 
   #include <shlwapi.h>
-  #define GetDirname(x) PathRemoveFileSpec(x)
+  char* GetDirname(char* path) {
+    char* dir = strdup(path);
+    PathRemoveFileSpec(dir);
+    return dir;
+  }
 #else
   #include <sys/stat.h>
   #include <unistd.h>
@@ -21,7 +27,11 @@
   #define GetCurrentDir getcwd
   #define PATH_SEP '/'
 
-  #define GetDirname(x) dirname(x)
+  char* GetDirname(char* path) {
+    char* dir = strdup(path);
+    char* dname = dirname(dir);
+    return dname;
+  }
 #endif
 
 enum { BigEndian, LittleEndian };
