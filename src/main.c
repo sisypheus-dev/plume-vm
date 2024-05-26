@@ -15,9 +15,11 @@ char* GetDirname(char* path);
   #define PATH_SEP '\\'
 
   #include <shlwapi.h>
+  #pragma comment(lib, "shlwapi.lib")
+
   char* GetDirname(char* path) {
     char* dir = strdup(path);
-    PathRemoveFileSpec(dir);
+    PathCchRemoveFileSpec(dir, strlen(dir));
     return dir;
   }
 #else
