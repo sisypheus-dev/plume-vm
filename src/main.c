@@ -1,3 +1,4 @@
+#include "core/gc.h"
 #include <core/debug.h>
 #include <core/error.h>
 #include <core/library.h>
@@ -18,7 +19,7 @@ char* GetDirname(char* path);
   #pragma comment(lib, "shlwapi.lib")
 
   char* GetDirname(char* path) {
-    char* dir = strdup(path);
+    char* dir = gc_strdup(&gc, path);
     PathRemoveFileSpec(dir);
     return dir;
   }
@@ -30,7 +31,7 @@ char* GetDirname(char* path);
   #define PATH_SEP '/'
 
   char* GetDirname(char* path) {
-    char* dir = strdup(path);
+    char* dir = gc_strdup(&gc, path);
     char* dname = dirname(dir);
     return dname;
   }
@@ -66,17 +67,19 @@ int main(int argc, char** argv) {
   unsigned long long start = clock_gettime_nsec_np(CLOCK_MONOTONIC);
 #endif
 
+  gc_start(&gc, &argc);
+
   if (argc < 2) THROW_FMT("Usage: %s <file>\n", argv[0]);
   FILE* file = fopen(argv[1], "rb");
 
-  Value* values = malloc(argc * sizeof(Value));
+  Value* values = gc_malloc(&gc, sizeof(Value) * argc);
   for (int i = 0; i < argc; i++) {
-    values[i] = MAKE_STRING(argv[i], strlen(argv[i]));
+    values[i] = MAKE_STRING(argv[i]);
   }
 
   if (file == NULL) THROW_FMT("Could not open file: %s\n", argv[1]);
 
-  char* filename = strdup(argv[1]);
+  char* filename = gc_strdup(&gc, argv[1]);
   char* dir = GetDirname(filename);
   size_t len = strlen(dir);
 
@@ -92,7 +95,7 @@ int main(int argc, char** argv) {
 
   des.module->argc = argc;
   des.module->argv = values;
-  des.module->handles = malloc(des.libraries.num_libraries * sizeof(void*));
+  des.module->handles = gc_malloc(&gc, des.libraries.num_libraries * sizeof(void*));
 
   struct Env res = get_std_path();
 
@@ -109,7 +112,7 @@ int main(int argc, char** argv) {
     }
 
     char* final_path =
-        malloc((lib.is_standard ? res.path_len + 1 : len + 1) + strlen(path) + 1);
+        gc_malloc(&gc, (lib.is_standard ? res.path_len + 1 : len + 1) + strlen(path) + 1);
 
     if (lib.is_standard && res.res == 0) {
       sprintf(final_path, "%s%c%s", res.path, PATH_SEP, path);
@@ -119,7 +122,7 @@ int main(int argc, char** argv) {
 
     des.module->handles[i] = load_library(final_path);
     des.module->natives[i].functions =
-        calloc(lib.num_functions, sizeof(Native));
+        gc_calloc(&gc, lib.num_functions, sizeof(Native));
   }
 
 #if DEBUG
@@ -141,6 +144,8 @@ int main(int argc, char** argv) {
   unsigned long long interp_time = (end_interp - start_interp) / 1000 / 1000;
   DEBUG_PRINTLN("Interpretation took %lld ms", interp_time);
 #endif
+
+  gc_stop(&gc);
 
   return 0;
 }

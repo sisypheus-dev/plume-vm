@@ -53,7 +53,7 @@ Value compare_eq(Value a, Value b) {
       return MAKE_INTEGER(1);
     }
     case TYPE_SPECIAL: return MAKE_INTEGER(1);
-    default: 
+    default:
       THROW_FMT("Cannot compare values of type %s", type_of(a));
   }
 }
@@ -87,7 +87,7 @@ void op_call(Module *module, int32_t *pc, Value callee, int32_t argc) {
   int32_t new_pc = *pc + 4;
 
   stack_push(module->stack, MAKE_FUNCENV(new_pc, old_sp, module->base_pointer));
-  
+
   module->base_pointer = module->stack->stack_pointer - 1;
   module->callstack++;
 
@@ -149,18 +149,18 @@ void run_interpreter(Deserialized des) {
 
   #define UNKNOWN &&case_unknown
 
-  void* jmp_table[] = { 
-    &&case_load_local, &&case_store_local, &&case_load_constant, 
-    &&case_load_global, &&case_store_global, &&case_return, 
-    &&case_compare, &&case_and, &&case_or, &&case_load_native, 
-    &&case_make_list, &&case_list_get, &&case_call, 
+  void* jmp_table[] = {
+    &&case_load_local, &&case_store_local, &&case_load_constant,
+    &&case_load_global, &&case_store_global, &&case_return,
+    &&case_compare, &&case_and, &&case_or, &&case_load_native,
+    &&case_make_list, &&case_list_get, &&case_call,
     &&case_jump_else_rel, &&case_type_of, UNKNOWN, UNKNOWN,
-    &&case_make_lambda, &&case_get_index, 
+    &&case_make_lambda, &&case_get_index,
     &&case_special, &&case_jump_rel, &&case_slice, &&case_list_length,
-    &&case_halt, &&case_update, &&case_make_mutable, &&case_unmut, 
-    &&case_add, &&case_sub, &&case_return_const, &&case_add_const, 
-    &&case_sub_const, &&case_jump_else_rel_cmp, &&case_ijump_else_rel_cmp, 
-    &&case_jump_else_rel_cmp_constant, 
+    &&case_halt, &&case_update, &&case_make_mutable, &&case_unmut,
+    &&case_add, &&case_sub, &&case_return_const, &&case_add_const,
+    &&case_sub_const, &&case_jump_else_rel_cmp, &&case_ijump_else_rel_cmp,
+    &&case_jump_else_rel_cmp_constant,
     &&case_ijump_else_rel_cmp_constant, &&case_call_global,
     &&case_call_local, &&case_make_and_store_lambda, &&case_mul,
     &&case_mul_const, &&case_return_unit };
@@ -196,13 +196,13 @@ void run_interpreter(Deserialized des) {
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
-  
+
   case_store_global: {
     module->stack->values[i1] = stack_pop(module->stack);
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
-  
+
   case_return: {
     Frame fr = pop_frame(module);
     Value ret = stack_pop(module->stack);
@@ -214,7 +214,7 @@ void run_interpreter(Deserialized des) {
     pc = fr.instruction_pointer;
     goto *jmp_table[op];
   }
-  
+
   case_compare: {
     Value a = stack_pop(module->stack);
     Value b = stack_pop(module->stack);
@@ -223,7 +223,7 @@ void run_interpreter(Deserialized des) {
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
-  
+
   case_and: {
     Value a = stack_pop(module->stack);
     Value b = stack_pop(module->stack);
@@ -255,16 +255,16 @@ void run_interpreter(Deserialized des) {
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
-  
+
   case_make_list: {
-    Value* values = malloc(sizeof(Value) * i1);
+    Value* values = gc_malloc(&gc, sizeof(Value) * i1);
     memcpy(values, stack_pop_n(module->stack, i1),
             i1 * sizeof(Value));
     stack_push(module->stack, MAKE_LIST(values, i1));
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
-  
+
   case_list_get: {
     Value list = stack_pop(module->stack);
     uint32_t idx = GET_INT(i1);
@@ -275,17 +275,17 @@ void run_interpreter(Deserialized des) {
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
-  
+
   case_call: {
     Value callee = stack_pop(module->stack);
 
     ASSERT(IS_FUN(callee) || IS_PTR(callee), "Invalid callee type");
-  
+
     interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, &pc, callee, i1);
 
     goto *jmp_table[op];
   }
-  
+
   case_jump_else_rel: {
     Value value = stack_pop(module->stack);
     ASSERT(get_type(value) == TYPE_INTEGER, "Invalid value type")
@@ -296,10 +296,10 @@ void run_interpreter(Deserialized des) {
     }
     goto *jmp_table[op];
   }
-  
+
   case_type_of: {
     Value value = stack_pop(module->stack);
-    stack_push(module->stack, MAKE_STRING(type_of(value), strlen(type_of(value))));
+    stack_push(module->stack, MAKE_STRING(type_of(value)));
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -313,7 +313,7 @@ void run_interpreter(Deserialized des) {
 
     goto *jmp_table[op];
   }
-  
+
   case_get_index: {
     Value index = stack_pop(module->stack);
     Value list = stack_pop(module->stack);
@@ -322,7 +322,7 @@ void run_interpreter(Deserialized des) {
 
     HeapValue* l = GET_PTR(list);
     uint32_t idx = GET_INT(index);
-  
+
     ASSERT(idx < l->length, "Index out of bounds");
     stack_push(module->stack, l->as_ptr[idx]);
     INCREASE_IP(pc);
@@ -339,16 +339,16 @@ void run_interpreter(Deserialized des) {
     INCREASE_IP_BY(pc, i1);
     goto *jmp_table[op];
   }
-  
+
   case_slice: {
     Value list = stack_pop(module->stack);
     ASSERT(get_type(list) == TYPE_LIST, "Invalid list type");
     HeapValue* l = GET_PTR(list);
-    HeapValue* new_list = malloc(sizeof(HeapValue));
+    HeapValue* new_list = gc_malloc(&gc, sizeof(HeapValue));
 
     new_list->type = TYPE_LIST;
     new_list->length = l->length - i1;
-    new_list->as_ptr = malloc(sizeof(Value) * new_list->length);
+    new_list->as_ptr = gc_malloc(&gc, sizeof(Value) * new_list->length);
 
     memcpy(new_list->as_ptr, &l->as_ptr[i1], (l->length - i1) * sizeof(Value));
     stack_push(module->stack, MAKE_PTR(new_list));
@@ -384,9 +384,9 @@ void run_interpreter(Deserialized des) {
 
   case_make_mutable: {
     Value value = stack_pop(module->stack);
-    Value* v = malloc(sizeof(Value));
+    Value* v = gc_malloc(&gc, sizeof(Value));
     memcpy(v, &value, sizeof(Value));
-    HeapValue* l = malloc(sizeof(HeapValue));
+    HeapValue* l = gc_malloc(&gc, sizeof(HeapValue));
     l->type = TYPE_MUTABLE;
     l->length = 1;
     l->as_ptr = v;
@@ -403,7 +403,7 @@ void run_interpreter(Deserialized des) {
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
-    
+
   case_add: {
     Value a = stack_pop(module->stack);
     Value b = stack_pop(module->stack);
@@ -479,8 +479,8 @@ void run_interpreter(Deserialized des) {
     Value a = stack_pop(module->stack);
     Value b = stack_pop(module->stack);
 
-    void* icomparison_table[] = { 
-      UNKNOWN, UNKNOWN, &&icmp_eq, UNKNOWN, 
+    void* icomparison_table[] = {
+      UNKNOWN, UNKNOWN, &&icmp_eq, UNKNOWN,
       UNKNOWN, &&icmp_and, &&icmp_or };
 
     uint32_t res;
@@ -502,7 +502,7 @@ void run_interpreter(Deserialized des) {
     Value b = constants[i3];
 
     ASSERT(get_type(a) == get_type(b), "Expected integers");
-    
+
     Value cmp = compare_eq(a, b);
     ASSERT(get_type(cmp) == TYPE_INTEGER, "Expected integer");
 
@@ -521,8 +521,8 @@ void run_interpreter(Deserialized des) {
 
     ASSERT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers");
 
-    void* icomparison_table[] = { 
-      &&icmp_cst_lt, &&icmp_cst_gt, &&icmp_cst_eq, &&icmp_cst_neq, 
+    void* icomparison_table[] = {
+      &&icmp_cst_lt, &&icmp_cst_gt, &&icmp_cst_eq, &&icmp_cst_neq,
       &&icmp_cst_lte, &&icmp_cst_gte, &&icmp_cst_and, &&icmp_cst_or };
 
     uint32_t res;
@@ -548,7 +548,7 @@ void run_interpreter(Deserialized des) {
     Value callee = module->stack->values[i1];
 
     ASSERT(IS_FUN(callee) || IS_PTR(callee), "Invalid callee type");
-  
+
     interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, &pc, callee, i2);
 
     goto *jmp_table[op];
@@ -560,7 +560,7 @@ void run_interpreter(Deserialized des) {
     Value callee = module->stack->values[locals + i1];
 
     ASSERT(IS_FUN(callee) || IS_PTR(callee), "Invalid callee type");
-  
+
     interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, &pc, callee, i2);
 
     goto *jmp_table[op];
@@ -603,10 +603,10 @@ void run_interpreter(Deserialized des) {
     module->stack->stack_pointer = fr.stack_pointer;
     module->base_pointer = fr.base_ptr;
 
-    Value* values = malloc(sizeof(Value) * 3);
+    Value* values = gc_malloc(&gc, sizeof(Value) * 3);
     values[0] = MAKE_SPECIAL();
-    values[1] = MAKE_STRING("unit", 4);
-    values[2] = MAKE_STRING("unit", 4);
+    values[1] = MAKE_STRING("unit");
+    values[2] = MAKE_STRING("unit");
 
     stack_push(module->stack, MAKE_LIST(values, 3));
 
@@ -620,4 +620,3 @@ void run_interpreter(Deserialized des) {
     return;
   }
 }
-

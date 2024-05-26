@@ -67,7 +67,7 @@ Bytecode deserialize_bytecode(FILE* file) {
   int32_t instruction_count;
   fread(&instruction_count, sizeof(int32_t), 1, file);
 
-  Instruction* instructions = malloc(instruction_count * sizeof(Instruction));
+  Instruction* instructions = gc_malloc(&gc, instruction_count * sizeof(Instruction));
   for (int32_t i = 0; i < instruction_count; i++) {
     instructions[i] = deserialize_instruction(file);
   }
@@ -104,11 +104,11 @@ Value deserialize_value(FILE* file) {
       int32_t length;
       fread(&length, sizeof(int32_t), 1, file);
 
-      char* string_value = malloc(length + 1);
+      char* string_value = gc_malloc(&gc, length + 1);
       fread(string_value, sizeof(char), length, file);
       string_value[length] = '\0';
 
-      value = MAKE_STRING(string_value, length);
+      value = MAKE_STRING(string_value);
       break;
     }
 
@@ -125,7 +125,7 @@ Constants deserialize_constants(FILE* file) {
   int32_t constant_count;
   fread(&constant_count, sizeof(int32_t), 1, file);
 
-  constants = malloc(constant_count * sizeof(Value));
+  constants = gc_malloc(&gc, constant_count * sizeof(Value));
   for (int32_t i = 0; i < constant_count; i++) {
     constants[i] = deserialize_value(file);
   }
@@ -142,13 +142,13 @@ Libraries deserialize_libraries(FILE* file) {
   fread(&library_count, sizeof(int32_t), 1, file);
 
   libraries.num_libraries = library_count;
-  libraries.libraries = malloc(library_count * sizeof(Library));
+  libraries.libraries = gc_malloc(&gc, library_count * sizeof(Library));
 
   for (int32_t i = 0; i < library_count; i++) {
     int32_t length;
     fread(&length, sizeof(int32_t), 1, file);
 
-    char* library_name = malloc(length + 1);
+    char* library_name = gc_malloc(&gc, length + 1);
     fread(library_name, sizeof(char), length, file);
     library_name[length] = '\0';
 
@@ -173,7 +173,7 @@ Libraries deserialize_libraries(FILE* file) {
 }
 
 Deserialized deserialize(FILE* file) {
-  Module* module = malloc(sizeof(Module));
+  Module* module = gc_malloc(&gc, sizeof(Module));
 
   Constants constants_ = deserialize_constants(file);
   Libraries libraries = deserialize_libraries(file);
@@ -181,13 +181,13 @@ Deserialized deserialize(FILE* file) {
   int32_t instr_count;
   fread(&instr_count, sizeof(int32_t), 1, file);
 
-  int32_t* instrs = malloc(instr_count * 4 * sizeof(int32_t));
+  int32_t* instrs = gc_malloc(&gc, instr_count * 4 * sizeof(int32_t));
   fread(instrs, sizeof(int32_t), instr_count * 4, file);
 
   module->constants = constants_;
   module->stack = stack_new();
   module->callstack = 0;
-  module->natives = calloc(libraries.num_libraries, sizeof(Native));
+  module->natives = gc_calloc(&gc, libraries.num_libraries, sizeof(Native));
 
   Deserialized deserialized;
   deserialized.module = module;

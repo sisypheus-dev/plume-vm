@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 Stack* stack_new() {
-  Stack* stack = malloc(sizeof(Stack));
+  Stack* stack = gc_malloc(&gc, sizeof(Stack));
   stack->stack_pointer = BASE_POINTER;
   return stack;
 }

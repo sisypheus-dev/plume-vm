@@ -1,9 +1,11 @@
 #ifndef VALUE_H
 #define VALUE_H
 
+#include "core/gc.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 typedef uint64_t Value;
 
 // Masks for important segments of a float value
@@ -87,9 +89,9 @@ typedef Value Closure[2];
 #define MAKE_FUNCTION(x, y) (SIGNATURE_FUNCTION | (uint16_t) (x) | ((uint16_t) (y) << 16))
 #define MAKE_FUNCENV(pc, sp, bp) (SIGNATURE_FUNCENV | (uint64_t) (pc) | ((uint64_t) (sp) << 16) | ((uint64_t) (bp) << 32))
 
-static inline Value MAKE_STRING(char* x, uint32_t len) {
-  HeapValue* v = malloc(sizeof(HeapValue));
-  v->length = len;
+static inline Value MAKE_STRING(char* x) {
+  HeapValue* v = gc_malloc(&gc, sizeof(HeapValue));
+  v->length = strlen(x);
   v->type = TYPE_STRING;
   v->as_string = x;
   v->refcount = 0;
@@ -97,7 +99,7 @@ static inline Value MAKE_STRING(char* x, uint32_t len) {
 }
 
 static inline Value MAKE_LIST(Value* x, uint32_t len) {
-  HeapValue* v = malloc(sizeof(HeapValue));
+  HeapValue* v = gc_malloc(&gc, sizeof(HeapValue));
   v->length = len;
   v->type = TYPE_LIST;
   v->as_ptr = x;
@@ -106,7 +108,7 @@ static inline Value MAKE_LIST(Value* x, uint32_t len) {
 }
 
 static inline Value MAKE_MUTABLE(Value x) {
-  HeapValue* v = malloc(sizeof(HeapValue));
+  HeapValue* v =gc_malloc(&gc, sizeof(HeapValue));
   v->length = 1;
   v->type = TYPE_MUTABLE;
   v->as_ptr = &x;
@@ -158,9 +160,9 @@ static inline char* type_of(Value value) {
   switch (get_type(value)) {
     case TYPE_INTEGER:
       return "integer";
-    case TYPE_FUNCTION: 
+    case TYPE_FUNCTION:
       return "function";
-    case TYPE_FUNCENV: 
+    case TYPE_FUNCENV:
       return "function_env";
     case TYPE_FLOAT:
       return "float";
