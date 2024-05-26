@@ -4,7 +4,11 @@ else
     set_toolchains("clang")
 end
 
+add_requires("libcurl")
+
 set_warnings("allextra")
+
+-- add_rpathdirs("/Volumes/Programmation/Plume/plume/standard/runtime/lib/")
 
 target("plume-vm")
     add_rules("mode.release")
@@ -25,9 +29,15 @@ target("plume-vm-test")
     add_ldflags("-pg")
     set_optimize("fastest")
 
-target("plume-runtime")
-    add_files("src/**.c")
+target("plume-natives")
+    add_files("standard/**.c")
+    add_files("src/core/*.c")
+    add_files("src/value.c")
     add_includedirs("include")
     set_kind("shared")
-    set_targetdir("lib")
-    set_basename("plume-runtime")
+    add_packages("libcurl")
+    
+    set_targetdir(".")
+    set_basename("native")
+    set_prefixname("")
+    set_extension(".plmc")
