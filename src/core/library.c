@@ -12,6 +12,13 @@ void* get_proc_address(DLL library, const char* name) {
 
 void free_library(DLL library) { FreeLibrary(library); }
 
+char* get_library_error() {
+  static char error[256];
+  FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(),
+                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), error, 255, NULL);
+  return error;
+}
+
 #else
 #include <dlfcn.h>
 
@@ -21,5 +28,7 @@ void* get_proc_address(DLL library, const char* name) {
   return dlsym(library, name);
 }
 void free_library(DLL library) { dlclose(library); }
+
+char* get_library_error() { return dlerror(); }
 
 #endif

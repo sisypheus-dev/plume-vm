@@ -13,5 +13,6 @@ typedef void* DLL;
 DLL load_library(const char* path);
 void* get_proc_address(DLL library, const char* name);
 void free_library(DLL library);
+char* get_library_error();
 
 #endif
