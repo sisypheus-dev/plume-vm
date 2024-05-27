@@ -91,8 +91,6 @@ int main(int argc, char** argv) {
 
   Deserialized des = deserialize(file);
 
-  des.module->gc = gc;
-
   fclose(file);
 
   des.module->argc = argc;
@@ -122,13 +120,7 @@ int main(int argc, char** argv) {
       sprintf(final_path, "%s%c%s", dir, PATH_SEP, path);
     }
 
-    DLL library = load_library(final_path);
-
-    if (library == NULL) {
-      THROW_FMT("Could not load library %s with error: %s\n", final_path, get_library_error());
-    }
-
-    des.module->handles[i] = library;
+    des.module->handles[i] = load_library(final_path);
     des.module->natives[i].functions =
         gc_calloc(&gc, lib.num_functions, sizeof(Native));
   }

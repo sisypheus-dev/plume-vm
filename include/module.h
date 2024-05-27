@@ -22,8 +22,6 @@ typedef struct Module {
 
   int32_t argc;
   Value *argv;
-  
-  GarbageCollector gc;
 } Module;
 
 typedef Value (*Native)(int argc, Module *m, Value *args);
