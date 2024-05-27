@@ -1,7 +1,6 @@
 # Xmake cache
 .xmake/
 build/
-xmake.lua
 
 # MacOS Cache
 .DS_Store
@@ -29,6 +28,7 @@ _*
 /compile_flags.txt
 
 # CMake
+/CMakeLists.txt
 /cmake-build-debug/
 /cmake-build-release/
 
