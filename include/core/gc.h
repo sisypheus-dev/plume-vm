@@ -6,51 +6,99 @@
 #define __GC_H__
 
 #include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
-struct AllocationMap;
+typedef struct Object {
+  bool marked;
+  struct Object* next;
+  struct Object** references;
+  size_t size;
+} Object;
 
-typedef struct GarbageCollector {
-    struct AllocationMap* allocs; // allocation map
-    bool paused;                  // (temporarily) switch gc on/off
-    void *bos;                    // bottom of stack
-    size_t min_size;
-} GarbageCollector;
+typedef struct {
+  Object* objects;
+  Object* roots;
+  size_t object_count;
+  size_t max_objects;
+} GC;
 
-extern GarbageCollector gc;  // Global garbage collector for all
-                             // single-threaded applications
+static GC gc = {NULL, NULL, 0, 8};
+void gc_collect(GC* gc);
 
-/*
- * Starting, stopping, pausing, resuming and running the GC.
- */
-void gc_start(GarbageCollector* gc, void* bos);
-void gc_start_ext(GarbageCollector* gc, void* bos, size_t initial_size, size_t min_size,
-                  double downsize_load_factor, double upsize_load_factor, double sweep_factor);
-size_t gc_stop(GarbageCollector* gc);
-void gc_pause(GarbageCollector* gc);
-void gc_resume(GarbageCollector* gc);
-size_t gc_run(GarbageCollector* gc);
+static Object* new_object(GC* gc, size_t size, int ref_count) {
+  if (gc->object_count >= gc->max_objects) {
+    gc_collect(gc);
+  }
 
-/*
- * Allocating and deallocating memory.
- */
-void* gc_malloc(GarbageCollector* gc, size_t size);
-void* gc_malloc_static(GarbageCollector* gc, size_t size, void (*dtor)(void*));
-void* gc_malloc_ext(GarbageCollector* gc, size_t size, void (*dtor)(void*));
-void* gc_calloc(GarbageCollector* gc, size_t count, size_t size);
-void* gc_calloc_ext(GarbageCollector* gc, size_t count, size_t size, void (*dtor)(void*));
-void* gc_realloc(GarbageCollector* gc, void* ptr, size_t size);
-void gc_free(GarbageCollector* gc, void* ptr);
+  Object* obj = (Object*)malloc(sizeof(Object));
+  obj->marked = false;
+  obj->next = gc->objects;
+  obj->size = size;
+  obj->references =
+      ref_count > 0 ? (Object**)malloc(sizeof(Object*) * ref_count) : NULL;
+  gc->objects = obj;
+  gc->object_count++;
+  return obj;
+}
 
-/*
- * Lifecycle management
- */
-void* gc_make_static(GarbageCollector* gc, void* ptr);
+static inline void mark(GC* gc, Object* obj) {
+  if (obj == NULL || obj->marked) return;
+  obj->marked = true;
+  for (size_t i = 0; i < obj->size / sizeof(Object*); i++) {
+    mark(gc, obj->references[i]);
+  }
+}
 
-/*
- * Helper functions and stdlib replacements.
- */
-char* gc_strdup (GarbageCollector* gc, const char* s);
+static inline void sweep(GC* gc) {
+  Object** obj = &gc->objects;
+  while (*obj) {
+    if (!(*obj)->marked) {
+      Object* unreferenced = *obj;
+      *obj = unreferenced->next;
+      free(unreferenced->references);
+      free(unreferenced);
+      gc->object_count--;
+    } else {
+      (*obj)->marked = false;
+      obj = &(*obj)->next;
+    }
+  }
+}
+
+static void* gc_malloc(GC* gc, size_t size) {
+  Object* obj = new_object(gc, size, 0);
+  return (void*)(obj + 1);
+}
+
+static inline void* gc_realloc(GC* gc, void* ptr, size_t size) {
+  if (!ptr) return gc_malloc(gc, size);
+
+  Object* obj = (Object*)ptr - 1;
+  Object* new_obj = new_object(gc, size, 0);
+  size_t copy_size = obj->size < size ? obj->size : size;
+  memcpy(new_obj + 1, obj + 1, copy_size);
+  return (void*)(new_obj + 1);
+}
+
+// Replace standard calloc with GC calloc
+static inline void* gc_calloc(GC* gc, size_t num, size_t size) {
+  size_t total_size = num * size;
+  void* ptr = gc_malloc(gc, total_size);
+  memset(ptr, 0, total_size);
+  return ptr;
+}
+
+static inline char* gc_strdup (GC* gc, const char* s)
+{
+    size_t len = strlen(s) + 1;
+    void *new = gc_malloc(gc, len);
+
+    if (new == NULL) {
+        return NULL;
+    }
+    return (char*) memcpy(new, s, len);
+}
 
 #endif /* !__GC_H__ */
