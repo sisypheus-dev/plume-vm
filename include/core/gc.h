@@ -25,9 +25,18 @@ typedef struct {
 } GC;
 
 static GC gc = {NULL, NULL, 0, 8};
-void gc_collect(GC* gc);
 
-static Object* new_object(GC* gc, size_t size, int ref_count) {
+static inline void mark(GC *gc, Object* obj);
+static inline void sweep(GC* gc);
+
+static inline void gc_collect(GC* gc) {
+  for (Object* root = gc->roots; root != NULL; root = root->next) {
+    mark(gc, root);
+  }
+  sweep(gc);
+}
+
+static inline Object* new_object(GC* gc, size_t size, int ref_count) {
   if (gc->object_count >= gc->max_objects) {
     gc_collect(gc);
   }
@@ -100,5 +109,6 @@ static inline char* gc_strdup (GC* gc, const char* s)
     }
     return (char*) memcpy(new, s, len);
 }
+
 
 #endif /* !__GC_H__ */
