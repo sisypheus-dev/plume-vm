@@ -67,6 +67,8 @@ int main(int argc, char** argv) {
   unsigned long long start = clock_gettime_nsec_np(CLOCK_MONOTONIC);
 #endif
 
+  gc_start(&gc, &argc);
+
   if (argc < 2) THROW_FMT("Usage: %s <file>\n", argv[0]);
   FILE* file = fopen(argv[1], "rb");
 
@@ -143,7 +145,7 @@ int main(int argc, char** argv) {
   DEBUG_PRINTLN("Interpretation took %lld ms", interp_time);
 #endif
 
-  gc_collect(&gc);
+  gc_stop(&gc);
 
   return 0;
 }
