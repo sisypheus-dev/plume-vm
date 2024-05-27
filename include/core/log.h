@@ -13,7 +13,8 @@ enum {
     LOGLEVEL_NONE
 };
 
-extern const char* log_level_strings[];
+
+static const char * log_level_strings [] = { "CRIT", "WARN", "INFO", "DEBG", "NONE" };
 
 #define log(level, fmt, ...) \
     do { if (level <= LOGLEVEL) fprintf(stderr, "[%s] %s:%s:%d: " fmt "\n", log_level_strings[level], __func__, __FILE__, __LINE__, __VA_ARGS__); } while (0)
