@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
 
   Value* values = gc_malloc(&gc, sizeof(Value) * argc);
   for (int i = 0; i < argc; i++) {
-    values[i] = MAKE_STRING(argv[i]);
+    values[i] = MAKE_STRING(gc, argv[i]);
   }
 
   if (file == NULL) THROW_FMT("Could not open file: %s\n", argv[1]);
@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
     THROW("Unsupported endianness");
   }
 
-  Deserialized des = deserialize(file);
+  Deserialized des = deserialize(gc, file);
 
   fclose(file);
 

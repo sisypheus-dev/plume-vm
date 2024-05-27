@@ -142,6 +142,8 @@ void run_interpreter(Deserialized des) {
   int32_t* bytecode = des.instrs;
   int32_t pc = 0;
 
+  GarbageCollector gc = module->gc;
+
   #define op bytecode[pc]
   #define i1 bytecode[pc + 1]
   #define i2 bytecode[pc + 2]
@@ -260,7 +262,7 @@ void run_interpreter(Deserialized des) {
     Value* values = gc_malloc(&gc, sizeof(Value) * i1);
     memcpy(values, stack_pop_n(module->stack, i1),
             i1 * sizeof(Value));
-    stack_push(module->stack, MAKE_LIST(values, i1));
+    stack_push(module->stack, MAKE_LIST(module->gc, values, i1));
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -299,7 +301,7 @@ void run_interpreter(Deserialized des) {
 
   case_type_of: {
     Value value = stack_pop(module->stack);
-    stack_push(module->stack, MAKE_STRING(type_of(value)));
+    stack_push(module->stack, MAKE_STRING(module->gc, type_of(value)));
     INCREASE_IP(pc);
     goto *jmp_table[op];
   }
@@ -605,10 +607,10 @@ void run_interpreter(Deserialized des) {
 
     Value* values = gc_malloc(&gc, sizeof(Value) * 3);
     values[0] = MAKE_SPECIAL();
-    values[1] = MAKE_STRING("unit");
-    values[2] = MAKE_STRING("unit");
+    values[1] = MAKE_STRING(module->gc, "unit");
+    values[2] = MAKE_STRING(module->gc, "unit");
 
-    stack_push(module->stack, MAKE_LIST(values, 3));
+    stack_push(module->stack, MAKE_LIST(module->gc, values, 3));
 
     pc = fr.instruction_pointer;
 

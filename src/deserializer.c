@@ -10,77 +10,7 @@
 #include <value.h>
 #include <interpreter.h>
 
-Instruction deserialize_instruction(FILE* file) {
-  Instruction instr;
-
-  uint8_t opcode;
-  fread(&opcode, sizeof(uint8_t), 1, file);
-
-  int32_t operand1 = 0, operand2 = 0, operand3 = 0;
-
-  instr.opcode = opcode;
-
-  switch (opcode) {
-    case OP_Return:
-    case OP_And:
-    case OP_Or:
-    case OP_TypeOf:
-    case OP_ConstructorName:
-    case OP_GetIndex:
-    case OP_Special:
-    case OP_ListLength:
-    case OP_Halt:
-    case OP_MakeMutable:
-    case OP_Update:
-    case OP_UnMut:
-    case OP_Add:
-    case OP_Sub:
-      break;
-    case OP_LoadNative: {
-      fread(&operand1, sizeof(int32_t), 1, file);
-      fread(&operand2, sizeof(int32_t), 1, file);
-      fread(&operand3, sizeof(int32_t), 1, file);
-      break;
-    }
-    default: {
-      fread(&operand1, sizeof(int32_t), 1, file);
-      switch (opcode) {
-        case OP_Phi:
-        case OP_MakeLambda: {
-          fread(&operand2, sizeof(int32_t), 1, file);
-          break;
-        }
-      }
-      break;
-    }
-  }
-  instr.operand1 = operand1;
-  instr.operand2 = operand2;
-  instr.operand3 = operand3;
-
-  return instr;
-}
-
-Bytecode deserialize_bytecode(FILE* file) {
-  Bytecode bytecode;
-
-  int32_t instruction_count;
-  fread(&instruction_count, sizeof(int32_t), 1, file);
-
-  Instruction* instructions = gc_malloc(&gc, instruction_count * sizeof(Instruction));
-  for (int32_t i = 0; i < instruction_count; i++) {
-    instructions[i] = deserialize_instruction(file);
-  }
-
-  assert(instructions != NULL);
-
-  bytecode.instructions = instructions;
-  bytecode.instruction_count = instruction_count;
-
-  return bytecode;
-}
-
-Value deserialize_value(FILE* file) {
+Value deserialize_value(GarbageCollector gc, FILE* file) {
   Value value;
 
   uint8_t type;
@@ -108,7 +38,7 @@ Value deserialize_value(FILE* file) {
       fread(string_value, sizeof(char), length, file);
       string_value[length] = '\0';
 
-      value = MAKE_STRING(string_value);
+      value = MAKE_STRING(gc, string_value);
       break;
     }
 
@@ -119,7 +49,7 @@ Value deserialize_value(FILE* file) {
   return value;
 }
 
-Constants deserialize_constants(FILE* file) {
+Constants deserialize_constants(GarbageCollector gc, FILE* file) {
   Constants constants;
 
   int32_t constant_count;
@@ -127,7 +57,7 @@ Constants deserialize_constants(FILE* file) {
 
   constants = gc_malloc(&gc, constant_count * sizeof(Value));
   for (int32_t i = 0; i < constant_count; i++) {
-    constants[i] = deserialize_value(file);
+    constants[i] = deserialize_value(gc, file);
   }
 
   assert(constants != NULL);
@@ -135,7 +65,7 @@ Constants deserialize_constants(FILE* file) {
   return constants;
 }
 
-Libraries deserialize_libraries(FILE* file) {
+Libraries deserialize_libraries(GarbageCollector gc, FILE* file) {
   Libraries libraries;
 
   int32_t library_count;
@@ -172,11 +102,12 @@ Libraries deserialize_libraries(FILE* file) {
   return libraries;
 }
 
-Deserialized deserialize(FILE* file) {
+Deserialized deserialize(GarbageCollector gc, FILE* file) {
+
   Module* module = gc_malloc(&gc, sizeof(Module));
 
-  Constants constants_ = deserialize_constants(file);
-  Libraries libraries = deserialize_libraries(file);
+  Constants constants_ = deserialize_constants(gc, file);
+  Libraries libraries = deserialize_libraries(gc, file);
 
   int32_t instr_count;
   fread(&instr_count, sizeof(int32_t), 1, file);
@@ -185,9 +116,10 @@ Deserialized deserialize(FILE* file) {
   fread(instrs, sizeof(int32_t), instr_count * 4, file);
 
   module->constants = constants_;
-  module->stack = stack_new();
+  module->stack = stack_new(gc);
   module->callstack = 0;
   module->natives = gc_calloc(&gc, libraries.num_libraries, sizeof(Native));
+  module->gc = gc;
 
   Deserialized deserialized;
   deserialized.module = module;
