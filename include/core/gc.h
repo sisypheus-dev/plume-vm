@@ -24,7 +24,7 @@ typedef struct {
   size_t max_objects;
 } GC;
 
-static GC gc = {NULL, NULL, 0, 8};
+static GC gc = {NULL, NULL, 0, 2048};
 
 static inline void mark(GC *gc, Object* obj);
 static inline void sweep(GC* gc);
