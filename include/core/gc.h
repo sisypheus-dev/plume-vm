@@ -525,7 +525,7 @@ static void gc_start_ext(GarbageCollector* gc,
 
 static void gc_start(GarbageCollector* gc, void* bos)
 {
-    gc_start_ext(gc, bos, 1024, 1024, 0.2, 0.8, 0.5);
+    gc_start_ext(gc, bos, 32768, 8192, 0.2, 0.8, 0.5);
 }
 
 static void gc_pause(GarbageCollector* gc)
