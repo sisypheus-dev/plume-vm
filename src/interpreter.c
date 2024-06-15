@@ -10,10 +10,50 @@
 #include <stdio.h>
 #include <value.h>
 
-#define INCREASE_IP_BY(pc, x) (pc += ((x) * 4))
-#define INCREASE_IP(pc) INCREASE_IP_BY(pc, 1)
+#define INCREASE_IP_BY(mod, x) (mod->pc += ((x) * 4))
+#define INCREASE_IP(mod) INCREASE_IP_BY(mod, 1)
 
 int halt = 0;
+
+Value list_get(Value list, int32_t idx) {
+  HeapValue* l = GET_PTR(list);
+  if (idx < 0 || idx >= l->length) THROW_FMT("Invalid index, received %d", idx);
+
+  return l->as_ptr[idx];
+}
+
+Value call_function(Deserialized *module, Value func, int32_t argc, Value* argv) {
+  ASSERT_FMT(module->callstack < MAX_FRAMES, "Call stack overflow, reached %d", module->callstack);
+  
+  Value func_env = list_get(func, 0);
+  Value callee   = list_get(func, 1);
+
+  stack_push(module->stack, func_env);
+  for (int i = 0; i < argc - 1; i++) 
+    stack_push(module->stack, argv[i]);
+
+  int16_t ipc = (int16_t) (callee & MASK_PAYLOAD_INT);
+  int16_t local_space = (int16_t) ((callee >> 16) & MASK_PAYLOAD_INT);
+  int16_t old_sp = module->stack->stack_pointer - argc;
+
+  module->stack->stack_pointer += local_space - argc;
+
+  int32_t new_pc = module->pc + 4;
+
+  stack_push(module->stack, MAKE_FUNCENV(new_pc, old_sp, module->base_pointer));
+
+  module->base_pointer = module->stack->stack_pointer - 1;
+  module->callstack++;
+
+  Value ret = run_interpreter(module, ipc, true, module->callstack - 1);
+
+  // Removing an instruction to program counter because of native calls:
+  // They increase automatically the program counter by 4, and we don't want to
+  // mis-interpret bytecode.
+  module->pc -= 4;
+
+  return ret;
+}
 
 typedef Value (*ComparisonFun)(Value, Value);
 
@@ -75,7 +115,7 @@ Value compare_gt(Value a, Value b) {
 
 ComparisonFun comparison_table[] = { NULL, compare_gt, compare_eq, NULL, NULL, compare_and, compare_or };
 
-void op_call(Module *module, int32_t *pc, Value callee, int32_t argc) {
+void op_call(Deserialized *module, Value callee, int32_t argc) {
   ASSERT_FMT(module->callstack < MAX_FRAMES, "Call stack overflow, reached %d", module->callstack);
 
   int16_t ipc = (int16_t) (callee & MASK_PAYLOAD_INT);
@@ -84,17 +124,17 @@ void op_call(Module *module, int32_t *pc, Value callee, int32_t argc) {
 
   module->stack->stack_pointer += local_space - argc;
 
-  int32_t new_pc = *pc + 4;
+  int32_t new_pc = module->pc + 4;
 
   stack_push(module->stack, MAKE_FUNCENV(new_pc, old_sp, module->base_pointer));
 
   module->base_pointer = module->stack->stack_pointer - 1;
   module->callstack++;
 
-  *pc = ipc;
+  module->pc = ipc;
 }
 
-void op_native_call(Module *module, int32_t *pc, Value callee, int32_t argc) {
+void op_native_call(Deserialized *module, Value callee, int32_t argc) {
   char* fun = GET_NATIVE(callee);
 
   Value libIdx = stack_pop(module->stack);
@@ -129,25 +169,23 @@ void op_native_call(Module *module, int32_t *pc, Value callee, int32_t argc) {
     stack_push(module->stack, ret);
   }
 
-  *pc += 4;
+  module->pc += 4;
 }
 
-typedef void (*InterpreterFunc)(Module*, int32_t*, Value, int32_t);
+typedef void (*InterpreterFunc)(Deserialized*, Value, int32_t);
 
 InterpreterFunc interpreter_table[] = { op_native_call, op_call };
 
-void run_interpreter(Deserialized des) {
-  Module* module = des.module;
+Value run_interpreter(Deserialized *module, int32_t ipc, bool does_return, int32_t current_callstack) {
   Constants constants = module->constants;
-  int32_t* bytecode = des.instrs;
-  int32_t pc = 0;
-
+  int32_t* bytecode = module->instrs;
   GarbageCollector gc = module->gc;
+  module->pc = ipc;
 
-  #define op bytecode[pc]
-  #define i1 bytecode[pc + 1]
-  #define i2 bytecode[pc + 2]
-  #define i3 bytecode[pc + 3]
+  #define op bytecode[module->pc]
+  #define i1 bytecode[module->pc + 1]
+  #define i2 bytecode[module->pc + 2]
+  #define i3 bytecode[module->pc + 3]
 
   #define UNKNOWN &&case_unknown
 
@@ -174,34 +212,34 @@ void run_interpreter(Deserialized des) {
 
     Value value = module->stack->values[locals + i1];
     stack_push(module->stack, value);
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
   case_store_local: {
     int32_t locals = module->base_pointer;
     module->stack->values[locals + i1] = stack_pop(module->stack);
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
   case_load_constant: {
     Value value = constants[i1];
     stack_push(module->stack, value);
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
   case_load_global: {
     Value value = module->stack->values[i1];
     stack_push(module->stack, value);
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
   case_store_global: {
     module->stack->values[i1] = stack_pop(module->stack);
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -213,7 +251,11 @@ void run_interpreter(Deserialized des) {
     module->base_pointer = fr.base_ptr;
     stack_push(module->stack, ret);
 
-    pc = fr.instruction_pointer;
+    module->pc = fr.instruction_pointer;
+
+    if (does_return && current_callstack == module->callstack) 
+      return ret;
+
     goto *jmp_table[op];
   }
 
@@ -222,7 +264,7 @@ void run_interpreter(Deserialized des) {
     Value b = stack_pop(module->stack);
 
     stack_push(module->stack, comparison_table[i1](b, a));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -233,7 +275,7 @@ void run_interpreter(Deserialized des) {
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
     stack_push(module->stack, MAKE_INTEGER(a && b));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -244,7 +286,7 @@ void run_interpreter(Deserialized des) {
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
     stack_push(module->stack, MAKE_INTEGER(a || b));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -254,7 +296,7 @@ void run_interpreter(Deserialized des) {
     stack_push(module->stack, MAKE_INTEGER(i2));
     stack_push(module->stack, MAKE_INTEGER(i3));
     stack_push(module->stack, name);
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -263,18 +305,18 @@ void run_interpreter(Deserialized des) {
     memcpy(values, stack_pop_n(module->stack, i1),
             i1 * sizeof(Value));
     stack_push(module->stack, MAKE_LIST(module->gc, values, i1));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
   case_list_get: {
     Value list = stack_pop(module->stack);
     uint32_t idx = GET_INT(i1);
-    ASSERT_FMT(get_type(list) == TYPE_LIST, "Invalid list type at IPC %d", pc / 4);
+    ASSERT_FMT(get_type(list) == TYPE_LIST, "Invalid list type at IPC %d", module->pc / 4);
     HeapValue* l = GET_PTR(list);
     ASSERT(idx < l->length, "Index out of bounds");
     stack_push(module->stack, l->as_ptr[idx]);
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -282,8 +324,8 @@ void run_interpreter(Deserialized des) {
     Value callee = stack_pop(module->stack);
 
     ASSERT(IS_FUN(callee) || IS_PTR(callee), "Invalid callee type");
-
-    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, &pc, callee, i1);
+    
+    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, callee, i1);
 
     goto *jmp_table[op];
   }
@@ -292,9 +334,9 @@ void run_interpreter(Deserialized des) {
     Value value = stack_pop(module->stack);
     ASSERT(get_type(value) == TYPE_INTEGER, "Invalid value type")
     if (GET_INT(value) == 0) {
-      INCREASE_IP_BY(pc, i1);
+      INCREASE_IP_BY(module, i1);
     } else {
-      INCREASE_IP(pc);
+      INCREASE_IP(module);
     }
     goto *jmp_table[op];
   }
@@ -302,16 +344,16 @@ void run_interpreter(Deserialized des) {
   case_type_of: {
     Value value = stack_pop(module->stack);
     stack_push(module->stack, MAKE_STRING(module->gc, type_of(value)));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
   case_make_lambda: {
-    int32_t new_pc = pc + 4;
+    int32_t new_pc = module->pc + 4;
     Value lambda = MAKE_FUNCTION(new_pc, i2);
 
     stack_push(module->stack, lambda);
-    INCREASE_IP_BY(pc, i1 + 1);
+    INCREASE_IP_BY(module, i1 + 1);
 
     goto *jmp_table[op];
   }
@@ -327,18 +369,18 @@ void run_interpreter(Deserialized des) {
 
     ASSERT(idx < l->length, "Index out of bounds");
     stack_push(module->stack, l->as_ptr[idx]);
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
   case_special: {
     stack_push(module->stack, MAKE_SPECIAL());
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
   case_jump_rel: {
-    INCREASE_IP_BY(pc, i1);
+    INCREASE_IP_BY(module, i1);
     goto *jmp_table[op];
   }
 
@@ -354,22 +396,22 @@ void run_interpreter(Deserialized des) {
 
     memcpy(new_list->as_ptr, &l->as_ptr[i1], (l->length - i1) * sizeof(Value));
     stack_push(module->stack, MAKE_PTR(new_list));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
   case_list_length: {
     Value list = stack_pop(module->stack);
-    ASSERT_FMT(get_type(list) == TYPE_LIST, "Invalid list type at IPC %d", pc / 4);
+    ASSERT_FMT(get_type(list) == TYPE_LIST, "Invalid list type at IPC %d", module->pc / 4);
     HeapValue* l = GET_PTR(list);
     stack_push(module->stack, MAKE_INTEGER(l->length));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
   case_halt: {
     halt = 1;
-    return;
+    return 0;
   }
 
   case_update: {
@@ -380,7 +422,7 @@ void run_interpreter(Deserialized des) {
 
     Value value = stack_pop(module->stack);
     memcpy(l->as_ptr, &value, sizeof(Value));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -394,7 +436,7 @@ void run_interpreter(Deserialized des) {
     l->as_ptr = v;
     Value mutable = MAKE_PTR(l);
     stack_push(module->stack, mutable);
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -402,7 +444,7 @@ void run_interpreter(Deserialized des) {
     Value value = stack_pop(module->stack);
     ASSERT(get_type(value) == TYPE_MUTABLE, "Invalid mutable type");
     stack_push(module->stack, GET_MUTABLE(value));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -413,7 +455,7 @@ void run_interpreter(Deserialized des) {
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
     stack_push(module->stack, MAKE_INTEGER(a + b));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -424,7 +466,7 @@ void run_interpreter(Deserialized des) {
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
     stack_push(module->stack, MAKE_INTEGER(b - a));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -435,7 +477,9 @@ void run_interpreter(Deserialized des) {
 
     stack_push(module->stack, constants[i1]);
 
-    pc = fr.instruction_pointer;
+    module->pc = fr.instruction_pointer;
+
+    if (does_return) return constants[i1];
 
     goto *jmp_table[op];
   }
@@ -447,7 +491,7 @@ void run_interpreter(Deserialized des) {
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
     stack_push(module->stack, MAKE_INTEGER(a + b));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -457,7 +501,7 @@ void run_interpreter(Deserialized des) {
 
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
     stack_push(module->stack, MAKE_INTEGER(a - b));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -469,9 +513,9 @@ void run_interpreter(Deserialized des) {
     ASSERT(get_type(cmp) == TYPE_INTEGER, "Expected integer");
 
     if (GET_INT(cmp) == 0) {
-      INCREASE_IP_BY(pc, i1);
+      INCREASE_IP_BY(module, i1);
     } else {
-      INCREASE_IP(pc);
+      INCREASE_IP(module);
     }
 
     goto *jmp_table[op];
@@ -494,7 +538,7 @@ void run_interpreter(Deserialized des) {
     icmp_or: { res = GET_INT(a) | GET_INT(b); goto next; }
 
     next: {
-      INCREASE_IP_BY(pc, (uint32_t) res == 0 ? i2 : 1);
+      INCREASE_IP_BY(module, (uint32_t) res == 0 ? i2 : 1);
       goto *jmp_table[op];
     }
   }
@@ -509,9 +553,9 @@ void run_interpreter(Deserialized des) {
     ASSERT(get_type(cmp) == TYPE_INTEGER, "Expected integer");
 
     if (GET_INT(cmp) == 0) {
-      INCREASE_IP_BY(pc, i1);
+      INCREASE_IP_BY(module, i1);
     } else {
-      INCREASE_IP(pc);
+      INCREASE_IP(module);
     }
 
     goto *jmp_table[op];
@@ -541,7 +585,7 @@ void run_interpreter(Deserialized des) {
     icmp_cst_or: { res = GET_INT(a) | GET_INT(b); goto next_cst; }
 
     next_cst: {
-      INCREASE_IP_BY(pc, (uint32_t) res == 0 ? i1 : 1);
+      INCREASE_IP_BY(module, (uint32_t) res == 0 ? i1 : 1);
       goto *jmp_table[op];
     }
   }
@@ -551,7 +595,7 @@ void run_interpreter(Deserialized des) {
 
     ASSERT(IS_FUN(callee) || IS_PTR(callee), "Invalid callee type");
 
-    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, &pc, callee, i2);
+    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, callee, i2);
 
     goto *jmp_table[op];
   }
@@ -563,18 +607,18 @@ void run_interpreter(Deserialized des) {
 
     ASSERT(IS_FUN(callee) || IS_PTR(callee), "Invalid callee type");
 
-    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, &pc, callee, i2);
+    interpreter_table[(callee & MASK_SIGNATURE) == SIGNATURE_FUNCTION](module, callee, i2);
 
     goto *jmp_table[op];
   }
 
   case_make_and_store_lambda: {
-    int32_t new_pc = pc + 4;
+    int32_t new_pc = module->pc + 4;
     Value lambda = MAKE_FUNCTION(new_pc, i3);
 
     module->stack->values[i1] = lambda;
 
-    INCREASE_IP_BY(pc, i2 + 1);
+    INCREASE_IP_BY(module, i2 + 1);
     goto *jmp_table[op];
   }
 
@@ -585,7 +629,7 @@ void run_interpreter(Deserialized des) {
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
     stack_push(module->stack, MAKE_INTEGER(a * b));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -596,7 +640,7 @@ void run_interpreter(Deserialized des) {
     ASSERT_FMT(get_type(a) == TYPE_INTEGER && get_type(b) == TYPE_INTEGER, "Expected integers, got %s and %s", type_of(a), type_of(b));
 
     stack_push(module->stack, MAKE_INTEGER(a * b));
-    INCREASE_IP(pc);
+    INCREASE_IP(module);
     goto *jmp_table[op];
   }
 
@@ -610,15 +654,18 @@ void run_interpreter(Deserialized des) {
     values[1] = MAKE_STRING(module->gc, "unit");
     values[2] = MAKE_STRING(module->gc, "unit");
 
-    stack_push(module->stack, MAKE_LIST(module->gc, values, 3));
+    Value unit = MAKE_LIST(module->gc, values, 3);
+    stack_push(module->stack, unit);
 
-    pc = fr.instruction_pointer;
+    module->pc = fr.instruction_pointer;
+
+    if (does_return) return unit;
 
     goto *jmp_table[op];
   }
 
   case_unknown: {
     THROW_FMT("Unknown opcode: %d", op);
-    return;
+    return 0;
   }
 }

@@ -93,9 +93,9 @@ int main(int argc, char** argv) {
 
   fclose(file);
 
-  des.module->argc = argc;
-  des.module->argv = values;
-  des.module->handles = gc_malloc(&gc, des.libraries.num_libraries * sizeof(void*));
+  des.argc = argc;
+  des.argv = values;
+  des.handles = gc_malloc(&gc, des.libraries.num_libraries * sizeof(void*));
 
   struct Env res = get_std_path();
 
@@ -120,8 +120,9 @@ int main(int argc, char** argv) {
       sprintf(final_path, "%s%c%s", dir, PATH_SEP, path);
     }
 
-    des.module->handles[i] = load_library(final_path);
-    des.module->natives[i].functions =
+    des.handles[i] = load_library(final_path);
+
+    des.natives[i].functions =
         gc_calloc(&gc, lib.num_functions, sizeof(Native));
   }
 
@@ -136,7 +137,7 @@ int main(int argc, char** argv) {
   unsigned long long start_interp = clock_gettime_nsec_np(CLOCK_MONOTONIC);
 #endif
 
-  run_interpreter(des);
+  run_interpreter(&des, 0, false, 0);
 
 #if DEBUG
   unsigned long long end_interp = clock_gettime_nsec_np(CLOCK_MONOTONIC);

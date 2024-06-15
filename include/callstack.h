@@ -25,7 +25,7 @@ typedef struct {
 CallStack *callstack_new();
 void callstack_free(CallStack *callstack);
 
-static inline Frame pop_frame(Module* mod) {
+static inline Frame pop_frame(Deserialized *mod) {
   Value clos_env = mod->stack->values[mod->base_pointer];
 
   ASSERT_FMT(get_type(clos_env) == TYPE_FUNCENV, "Expected closure environment got %s", type_of(clos_env));

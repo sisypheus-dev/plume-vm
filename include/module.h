@@ -9,14 +9,19 @@
 
 typedef Value *Constants;
 
-typedef struct Module {
+typedef struct {
+  Libraries libraries;
+  
+  int32_t instr_count;
+  int32_t *instrs;
+
   int32_t base_pointer;
   int32_t callstack;
 
   Constants constants;
   Stack *stack;
   struct {
-    Value (**functions)(int argc, struct Module *m, Value *args);
+    Value (**functions)(int argc, struct Deserialized *des, Value *args);
   } *natives;
   DLL* handles;
 
@@ -24,16 +29,12 @@ typedef struct Module {
   Value *argv;
 
   GarbageCollector gc;
-} Module;
-
-typedef Value (*Native)(int argc, Module *m, Value *args);
-
-typedef struct {
-  Module *module;
-  Libraries libraries;
-  
-  int32_t instr_count;
-  int32_t *instrs;
+  int32_t pc;
+  Value (*call_function)(struct Deserialized *m, Value callee, int32_t argc, Value* argv);
 } Deserialized;
+
+typedef Value (*Native)(int argc, struct Deserialized *m, Value *args);
+
+typedef Deserialized Module;
 
 #endif  // MODULE_H

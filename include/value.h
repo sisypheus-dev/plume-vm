@@ -55,6 +55,7 @@ typedef enum {
   TYPE_FUNCTION,
   TYPE_FUNCENV,
   TYPE_UNKNOWN,
+  TYPE_API,
 } ValueType;
 
 // Container for arrays
@@ -77,6 +78,7 @@ typedef struct {
   union {
     char* as_string;
     Value* as_ptr;
+    void* as_any;
   };
 } HeapValue;
 
@@ -176,6 +178,8 @@ static inline char* type_of(Value value) {
       return "mutable";
     case TYPE_UNKNOWN:
       return "unknown";
+    case TYPE_API: 
+      return "api";
   }
 }
 

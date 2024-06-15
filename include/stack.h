@@ -29,9 +29,9 @@ void stack_free(Stack *stack);
 #define stack_pop_n(stack, n) \
   &stack->values[stack->stack_pointer -= n]
 
-#define stack_push_n(stack, values, n) \
+#define stack_push_n(stack, vs, n) \
   ASSERT(!(DOES_OVERFLOW(stack, n)), "Stack overflow on stack push_n"); \
-  memcpy(&stack->values[stack->stack_pointer], values, n * sizeof(Value)); \
+  memcpy(&stack->values[stack->stack_pointer], vs, n * sizeof(Value)); \
   stack->stack_pointer += n
 
 #endif  // STACK_H
