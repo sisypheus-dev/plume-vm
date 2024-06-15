@@ -84,8 +84,8 @@ Libraries deserialize_libraries(GarbageCollector gc, FILE* file) {
 
     Library lib;
 
-    int32_t is_std;
-    fread(&is_std, sizeof(int32_t), 1, file);
+    uint8_t is_std;
+    fread(&is_std, sizeof(uint8_t), 1, file);
 
     int32_t function_count;
     fread(&function_count, sizeof(int32_t), 1, file);

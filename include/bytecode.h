@@ -62,7 +62,7 @@ typedef struct {
 typedef struct {
   char *name;
   int32_t num_functions;
-  bool is_standard;
+  int is_standard;
 } Library;
 
 typedef struct {

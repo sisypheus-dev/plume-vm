@@ -62,12 +62,21 @@ static inline struct Env get_std_path() {
   return env;
 }
 
+static inline struct Env get_mod_path() {
+  struct Env env;
+  env.path = getenv("PPM_PATH");
+  env.path_len = env.path == NULL ? 0 : strlen(env.path);
+  env.res = env.path == NULL;
+  return env;
+}
+
 int main(int argc, char** argv) {
 #if DEBUG
   unsigned long long start = clock_gettime_nsec_np(CLOCK_MONOTONIC);
 #endif
 
   gc_start(&gc, &argc);
+  gc_start_ext(&gc, &argc, 32768 * sizeof(Value), 32768 * sizeof(Value), 0.2, 0.8, 0.5);
 
   if (argc < 2) THROW_FMT("Usage: %s <file>\n", argv[0]);
   FILE* file = fopen(argv[1], "rb");
@@ -98,6 +107,7 @@ int main(int argc, char** argv) {
   des.handles = gc_malloc(&gc, des.libraries.num_libraries * sizeof(void*));
 
   struct Env res = get_std_path();
+  struct Env mod = get_mod_path();
 
   // TODO: Implement library loading in a flat manner
   //       in order to avoid `calloc` calls in the loop.
@@ -107,15 +117,27 @@ int main(int argc, char** argv) {
     Library lib = libs.libraries[i];
     char* path = lib.name;
 
-    if (lib.is_standard && res.res != 0) {
+    if (lib.is_standard == 1 && res.res != 0) {
       THROW("Standard library path not found");
     }
 
-    char* final_path =
-        gc_malloc(&gc, (lib.is_standard ? res.path_len + 1 : len + 1) + strlen(path) + 1);
+    if (lib.is_standard == 2 && mod.res != 0) {
+      THROW("PPM_PATH not found in environment");
+    }
 
-    if (lib.is_standard && res.res == 0) {
+    int final_len = lib.is_standard == 1 
+      ? res.path_len 
+      : lib.is_standard == 2
+        ? mod.path_len + 9
+        : len; 
+
+    char* final_path =
+        gc_malloc(&gc, final_len + strlen(path) + 2);
+
+    if (lib.is_standard == 1 && res.res == 0) {
       sprintf(final_path, "%s%c%s", res.path, PATH_SEP, path);
+    } else if (lib.is_standard == 2 && mod.res == 0) {
+      sprintf(final_path, "%s%c%s%c%s", mod.path, PATH_SEP, "modules", PATH_SEP, path);
     } else {
       sprintf(final_path, "%s%c%s", dir, PATH_SEP, path);
     }
