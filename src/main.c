@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <limits.h>
 
 char* GetDirname(char* path);
 
@@ -75,8 +76,12 @@ int main(int argc, char** argv) {
   unsigned long long start = clock_gettime_nsec_np(CLOCK_MONOTONIC);
 #endif
 
-  // gc_start(&gc, &argc);
-  gc_start_ext(&gc, &argc, 32768 * sizeof(Value), 32768 * sizeof(Value), 0.2, 0.8, 0.5);
+  #define min_gc_value 32768 * sizeof(Value)
+
+  gc_start_ext(&gc, &argc, 
+    min_gc_value, min_gc_value, 0.0, 4, 0.0);
+  
+  printf("%d\n", gc.allocs->size);
 
   if (argc < 2) THROW_FMT("Usage: %s <file>\n", argv[0]);
   FILE* file = fopen(argv[1], "rb");
