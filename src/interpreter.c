@@ -179,6 +179,7 @@ InterpreterFunc interpreter_table[] = { op_native_call, op_call };
 Value run_interpreter(Deserialized *module, int32_t ipc, bool does_return, int32_t current_callstack) {
   Constants constants = module->constants;
   int32_t* bytecode = module->instrs;
+  GarbageCollector gc = module->gc;
   module->pc = ipc;
 
   #define op bytecode[module->pc]
@@ -300,10 +301,10 @@ Value run_interpreter(Deserialized *module, int32_t ipc, bool does_return, int32
   }
 
   case_make_list: {
-    Value* values = GC_malloc(sizeof(Value) * i1);
+    Value* values = gc_malloc(&gc, sizeof(Value) * i1);
     memcpy(values, stack_pop_n(module->stack, i1),
             i1 * sizeof(Value));
-    stack_push(module->stack, MAKE_LIST(values, i1));
+    stack_push(module->stack, MAKE_LIST(module->gc, values, i1));
     INCREASE_IP(module);
     goto *jmp_table[op];
   }
@@ -342,7 +343,7 @@ Value run_interpreter(Deserialized *module, int32_t ipc, bool does_return, int32
 
   case_type_of: {
     Value value = stack_pop(module->stack);
-    stack_push(module->stack, MAKE_STRING(type_of(value)));
+    stack_push(module->stack, MAKE_STRING(module->gc, type_of(value)));
     INCREASE_IP(module);
     goto *jmp_table[op];
   }
@@ -387,11 +388,11 @@ Value run_interpreter(Deserialized *module, int32_t ipc, bool does_return, int32
     Value list = stack_pop(module->stack);
     ASSERT(get_type(list) == TYPE_LIST, "Invalid list type");
     HeapValue* l = GET_PTR(list);
-    HeapValue* new_list = GC_malloc(sizeof(HeapValue));
+    HeapValue* new_list = gc_malloc(&gc, sizeof(HeapValue));
 
     new_list->type = TYPE_LIST;
     new_list->length = l->length - i1;
-    new_list->as_ptr = GC_malloc(sizeof(Value) * new_list->length);
+    new_list->as_ptr = gc_malloc(&gc, sizeof(Value) * new_list->length);
 
     memcpy(new_list->as_ptr, &l->as_ptr[i1], (l->length - i1) * sizeof(Value));
     stack_push(module->stack, MAKE_PTR(new_list));
@@ -427,9 +428,9 @@ Value run_interpreter(Deserialized *module, int32_t ipc, bool does_return, int32
 
   case_make_mutable: {
     Value value = stack_pop(module->stack);
-    Value* v = GC_malloc(sizeof(Value));
+    Value* v = gc_malloc(&gc, sizeof(Value));
     memcpy(v, &value, sizeof(Value));
-    HeapValue* l = GC_malloc(sizeof(HeapValue));
+    HeapValue* l = gc_malloc(&gc, sizeof(HeapValue));
     l->type = TYPE_MUTABLE;
     l->length = 1;
     l->as_ptr = v;
@@ -648,12 +649,12 @@ Value run_interpreter(Deserialized *module, int32_t ipc, bool does_return, int32
     module->stack->stack_pointer = fr.stack_pointer;
     module->base_pointer = fr.base_ptr;
 
-    Value* values = GC_malloc(sizeof(Value) * 3);
+    Value* values = gc_malloc(&gc, sizeof(Value) * 3);
     values[0] = MAKE_SPECIAL();
-    values[1] = MAKE_STRING("unit");
-    values[2] = MAKE_STRING("unit");
+    values[1] = MAKE_STRING(module->gc, "unit");
+    values[2] = MAKE_STRING(module->gc, "unit");
 
-    Value unit = MAKE_LIST(values, 3);
+    Value unit = MAKE_LIST(module->gc, values, 3);
     stack_push(module->stack, unit);
 
     module->pc = fr.instruction_pointer;

@@ -1,4 +1,4 @@
-#include <gc.h>
+#include "core/gc.h"
 #include <core/debug.h>
 #include <core/error.h>
 #include <core/library.h>
@@ -31,7 +31,7 @@ char* GetDirname(char* path);
   #define PATH_SEP '/'
 
   char* GetDirname(char* path) {
-    char* dir = GC_strdup(path);
+    char* dir = gc_strdup(&gc, path);
     char* dname = dirname(dir);
     return dname;
   }
@@ -75,17 +75,20 @@ int main(int argc, char** argv) {
   unsigned long long start = clock_gettime_nsec_np(CLOCK_MONOTONIC);
 #endif
 
+  // gc_start(&gc, &argc);
+  gc_start_ext(&gc, &argc, 32768 * sizeof(Value), 32768 * sizeof(Value), 0.2, 0.8, 0.5);
+
   if (argc < 2) THROW_FMT("Usage: %s <file>\n", argv[0]);
   FILE* file = fopen(argv[1], "rb");
 
-  Value* values = GC_malloc(sizeof(Value) * argc);
+  Value* values = gc_malloc(&gc, sizeof(Value) * argc);
   for (int i = 0; i < argc; i++) {
-    values[i] = MAKE_STRING(argv[i]);
+    values[i] = MAKE_STRING(gc, argv[i]);
   }
 
   if (file == NULL) THROW_FMT("Could not open file: %s\n", argv[1]);
 
-  char* filename = GC_strdup(argv[1]);
+  char* filename = gc_strdup(&gc, argv[1]);
   char* dir = GetDirname(filename);
   size_t len = strlen(dir);
 
@@ -95,13 +98,13 @@ int main(int argc, char** argv) {
     THROW("Unsupported endianness");
   }
 
-  Deserialized des = deserialize(file);
+  Deserialized des = deserialize(gc, file);
 
   fclose(file);
 
   des.argc = argc;
   des.argv = values;
-  des.handles = GC_malloc(des.libraries.num_libraries * sizeof(void*));
+  des.handles = gc_malloc(&gc, des.libraries.num_libraries * sizeof(void*));
 
   struct Env res = get_std_path();
   struct Env mod = get_mod_path();
@@ -129,7 +132,7 @@ int main(int argc, char** argv) {
         : len; 
 
     char* final_path =
-        GC_malloc(final_len + strlen(path) + 2);
+        gc_malloc(&gc, final_len + strlen(path) + 2);
 
     if (lib.is_standard == 1 && res.res == 0) {
       sprintf(final_path, "%s%c%s", res.path, PATH_SEP, path);
@@ -142,7 +145,7 @@ int main(int argc, char** argv) {
     des.handles[i] = load_library(final_path);
 
     des.natives[i].functions =
-        GC_malloc(lib.num_functions * sizeof(Native));
+        gc_calloc(&gc, lib.num_functions, sizeof(Native));
   }
 
 #if DEBUG
@@ -164,6 +167,8 @@ int main(int argc, char** argv) {
   unsigned long long interp_time = (end_interp - start_interp) / 1000 / 1000;
   DEBUG_PRINTLN("Interpretation took %lld ms", interp_time);
 #endif
+
+  gc_stop(&gc);
 
   return 0;
 }
