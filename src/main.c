@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
   unsigned long long start = clock_gettime_nsec_np(CLOCK_MONOTONIC);
 #endif
 
-  gc_start(&gc, &argc);
+  // gc_start(&gc, &argc);
   gc_start_ext(&gc, &argc, 32768 * sizeof(Value), 32768 * sizeof(Value), 0.2, 0.8, 0.5);
 
   if (argc < 2) THROW_FMT("Usage: %s <file>\n", argv[0]);
