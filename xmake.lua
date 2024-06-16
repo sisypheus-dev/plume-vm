@@ -4,13 +4,10 @@ else
   set_toolchains("clang")
 end
 
-add_requires("bdwgc", {  system = false })
-
 set_warnings("allextra")
 
 target("plume-vm")
   add_rules("mode.release")
-  add_packages("bdwgc")
   add_files("src/**.c")
   add_includedirs("include")
   set_kind("binary") 
@@ -19,7 +16,6 @@ target("plume-vm")
 
 target("plume-vm-test")
   add_rules("mode.debug", "mode.profile")
-  add_packages("bdwgc")
   add_files("src/**.c")
   add_includedirs("include")
   set_targetdir("bin")
