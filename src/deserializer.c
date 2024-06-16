@@ -10,7 +10,7 @@
 #include <value.h>
 #include <interpreter.h>
 
-Value deserialize_value(GarbageCollector gc, FILE* file) {
+Value deserialize_value(FILE* file) {
   Value value;
 
   uint8_t type;
@@ -34,11 +34,11 @@ Value deserialize_value(GarbageCollector gc, FILE* file) {
       int32_t length;
       fread(&length, sizeof(int32_t), 1, file);
 
-      char* string_value = gc_malloc(&gc, length + 1);
+      char* string_value = GC_malloc(length + 1);
       fread(string_value, sizeof(char), length, file);
       string_value[length] = '\0';
 
-      value = MAKE_STRING(gc, string_value);
+      value = MAKE_STRING(string_value);
       break;
     }
 
@@ -49,15 +49,15 @@ Value deserialize_value(GarbageCollector gc, FILE* file) {
   return value;
 }
 
-Constants deserialize_constants(GarbageCollector gc, FILE* file) {
+Constants deserialize_constants(FILE* file) {
   Constants constants;
 
   int32_t constant_count;
   fread(&constant_count, sizeof(int32_t), 1, file);
 
-  constants = gc_malloc(&gc, constant_count * sizeof(Value));
+  constants = GC_malloc(constant_count * sizeof(Value));
   for (int32_t i = 0; i < constant_count; i++) {
-    constants[i] = deserialize_value(gc, file);
+    constants[i] = deserialize_value(file);
   }
 
   assert(constants != NULL);
@@ -65,20 +65,20 @@ Constants deserialize_constants(GarbageCollector gc, FILE* file) {
   return constants;
 }
 
-Libraries deserialize_libraries(GarbageCollector gc, FILE* file) {
+Libraries deserialize_libraries(FILE* file) {
   Libraries libraries;
 
   int32_t library_count;
   fread(&library_count, sizeof(int32_t), 1, file);
 
   libraries.num_libraries = library_count;
-  libraries.libraries = gc_malloc(&gc, library_count * sizeof(Library));
+  libraries.libraries = GC_malloc(library_count * sizeof(Library));
 
   for (int32_t i = 0; i < library_count; i++) {
     int32_t length;
     fread(&length, sizeof(int32_t), 1, file);
 
-    char* library_name = gc_malloc(&gc, length + 1);
+    char* library_name = GC_malloc(length + 1);
     fread(library_name, sizeof(char), length, file);
     library_name[length] = '\0';
 
@@ -102,14 +102,14 @@ Libraries deserialize_libraries(GarbageCollector gc, FILE* file) {
   return libraries;
 }
 
-Deserialized deserialize(GarbageCollector gc, FILE* file) {
-  Constants constants_ = deserialize_constants(gc, file);
-  Libraries libraries = deserialize_libraries(gc, file);
+Deserialized deserialize(FILE* file) {
+  Constants constants_ = deserialize_constants(file);
+  Libraries libraries = deserialize_libraries(file);
 
   int32_t instr_count;
   fread(&instr_count, sizeof(int32_t), 1, file);
 
-  int32_t* instrs = gc_malloc(&gc, instr_count * 4 * sizeof(int32_t));
+  int32_t* instrs = GC_malloc(instr_count * 4 * sizeof(int32_t));
   fread(instrs, sizeof(int32_t), instr_count * 4, file);
 
   Deserialized deserialized;
@@ -117,10 +117,9 @@ Deserialized deserialize(GarbageCollector gc, FILE* file) {
   deserialized.instr_count = instr_count;
   deserialized.instrs = instrs;
   deserialized.constants = constants_;
-  deserialized.stack = stack_new(gc);
+  deserialized.stack = stack_new();
   deserialized.callstack = 0;
-  deserialized.natives = gc_calloc(&gc, libraries.num_libraries, sizeof(Native));
-  deserialized.gc = gc;
+  deserialized.natives = GC_malloc(libraries.num_libraries * sizeof(Native));
   deserialized.call_function = call_function;
 
   return deserialized;

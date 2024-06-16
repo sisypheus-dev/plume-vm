@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-Stack* stack_new(GarbageCollector gc) {
-  Stack* stack = gc_malloc(&gc, sizeof(Stack));
+Stack* stack_new() {
+  Stack* stack = GC_malloc(sizeof(Stack));
   stack->stack_pointer = BASE_POINTER;
   return stack;
 }

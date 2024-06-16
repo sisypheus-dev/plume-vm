@@ -4,6 +4,6 @@
 #include <module.h>
 #include <stdio.h>
 
-Deserialized deserialize(GarbageCollector gc, FILE *file);
+Deserialized deserialize(FILE *file);
 
 #endif  // DESERIALIZER_H

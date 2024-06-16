@@ -15,7 +15,7 @@ typedef struct {
   int16_t stack_pointer;
 } Stack;
 
-Stack *stack_new(GarbageCollector gc);
+Stack *stack_new();
 void stack_free(Stack *stack);
 
 #define DOES_OVERFLOW(stack, n) stack->stack_pointer + n >= MAX_STACK_SIZE

@@ -28,7 +28,6 @@ typedef struct {
   int32_t argc;
   Value *argv;
 
-  GarbageCollector gc;
   int32_t pc;
   Value (*call_function)(struct Deserialized *m, Value callee, int32_t argc, Value* argv);
 } Deserialized;

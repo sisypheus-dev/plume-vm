@@ -1,7 +1,7 @@
 #ifndef VALUE_H
 #define VALUE_H
 
-#include "core/gc.h"
+#include <gc.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -91,8 +91,8 @@ typedef Value Closure[2];
 #define MAKE_FUNCTION(x, y) (SIGNATURE_FUNCTION | (uint16_t) (x) | ((uint16_t) (y) << 16))
 #define MAKE_FUNCENV(pc, sp, bp) (SIGNATURE_FUNCENV | (uint64_t) (pc) | ((uint64_t) (sp) << 16) | ((uint64_t) (bp) << 32))
 
-static inline Value MAKE_STRING(GarbageCollector gc, char* x) {
-  HeapValue* v = gc_malloc(&gc, sizeof(HeapValue));
+static inline Value MAKE_STRING(char* x) {
+  HeapValue* v = GC_malloc(sizeof(HeapValue));
   v->length = strlen(x);
   v->type = TYPE_STRING;
   v->as_string = x;
@@ -100,8 +100,8 @@ static inline Value MAKE_STRING(GarbageCollector gc, char* x) {
   return MAKE_PTR(v);
 }
 
-static inline Value MAKE_LIST(GarbageCollector gc, Value* x, uint32_t len) {
-  HeapValue* v = gc_malloc(&gc, sizeof(HeapValue));
+static inline Value MAKE_LIST(Value* x, uint32_t len) {
+  HeapValue* v = GC_malloc(sizeof(HeapValue));
   v->length = len;
   v->type = TYPE_LIST;
   v->as_ptr = x;
@@ -109,8 +109,8 @@ static inline Value MAKE_LIST(GarbageCollector gc, Value* x, uint32_t len) {
   return MAKE_PTR(v);
 }
 
-static inline Value MAKE_MUTABLE(GarbageCollector gc, Value x) {
-  HeapValue* v =gc_malloc(&gc, sizeof(HeapValue));
+static inline Value MAKE_MUTABLE(Value x) {
+  HeapValue* v = GC_malloc(sizeof(HeapValue));
   v->length = 1;
   v->type = TYPE_MUTABLE;
   v->as_ptr = &x;
