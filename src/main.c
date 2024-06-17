@@ -80,8 +80,6 @@ int main(int argc, char** argv) {
 
   gc_start_ext(&gc, &argc, 
     min_gc_value, min_gc_value, 0.0, 4, 0.0);
-  
-  printf("%d\n", gc.allocs->size);
 
   if (argc < 2) THROW_FMT("Usage: %s <file>\n", argv[0]);
   FILE* file = fopen(argv[1], "rb");
