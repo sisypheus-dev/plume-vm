@@ -8,6 +8,14 @@
 #include <string.h>
 typedef uint64_t Value;
 
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+typedef HANDLE thread_t;
+#else
+#include <pthread.h>
+typedef pthread_t thread_t;
+#endif
+
 // Masks for important segments of a float value
 #define MASK_SIGN        0x8000000000000000
 #define MASK_EXPONENT    0x7ff0000000000000
@@ -56,6 +64,7 @@ typedef enum {
   TYPE_FUNCENV,
   TYPE_UNKNOWN,
   TYPE_API,
+  TYPE_THREAD,
 } ValueType;
 
 // Container for arrays
@@ -79,6 +88,7 @@ typedef struct {
     char* as_string;
     Value* as_ptr;
     void* as_any;
+    thread_t as_thread;
   };
 } HeapValue;
 
@@ -180,6 +190,8 @@ static inline char* type_of(Value value) {
       return "unknown";
     case TYPE_API: 
       return "api";
+    case TYPE_THREAD:
+      return "thread";
   }
 }
 

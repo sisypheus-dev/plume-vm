@@ -55,6 +55,54 @@ Value call_function(Deserialized *module, Value func, int32_t argc, Value* argv)
   return ret;
 }
 
+Value call_threaded(Deserialized *module, Value func, int32_t argc, Value* argv) {
+  Module* new_module = gc_malloc(&module->gc, sizeof(Module));
+  new_module->stack = stack_new(module->gc);
+
+  // Copy old stack to new stack
+  for (int i = 0; i < module->stack->stack_pointer; i++) {
+    new_module->stack->values[i] = module->stack->values[i];
+  }
+
+  Value func_env = list_get(func, 0);
+  Value callee   = list_get(func, 1);
+
+  stack_push(new_module->stack, func_env);
+  for (int i = 0; i < argc - 1; i++) 
+    stack_push(new_module->stack, argv[i]);
+
+  int16_t ipc = (int16_t) (callee & MASK_PAYLOAD_INT);
+  int16_t local_space = (int16_t) ((callee >> 16) & MASK_PAYLOAD_INT);
+  int16_t old_sp = new_module->stack->stack_pointer - argc;
+
+  new_module->stack->stack_pointer += local_space - argc;
+
+  int32_t new_pc = module->pc + 4;
+
+  stack_push(new_module->stack, MAKE_FUNCENV(new_pc, old_sp, module->base_pointer));
+
+  new_module->base_pointer = new_module->stack->stack_pointer - 1;
+  new_module->callstack++;
+
+  new_module->instr_count = module->instr_count;
+  new_module->instrs = module->instrs;
+  new_module->constants = module->constants;
+  new_module->gc = module->gc;
+  new_module->natives = module->natives;
+  new_module->handles = module->handles;
+  new_module->argc = module->argc;
+  new_module->argv = module->argv;
+  new_module->call_function = call_function;
+  new_module->call_threaded = call_threaded;
+
+  // module->pc = new_pc;
+
+  Value ret = run_interpreter(new_module, ipc, true, new_module->callstack - 1);
+
+  return ret;
+}
+
+
 typedef Value (*ComparisonFun)(Value, Value);
 
 Value compare_eq(Value a, Value b) {

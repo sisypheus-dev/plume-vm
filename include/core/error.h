@@ -33,9 +33,17 @@
     THROW_FMT(__VA_ARGS__);        \
   }
 
+#define ASSERT_TYPE(func, v, t) \
+  ASSERT_FMT(get_type(v) == t, "%s expected %s, but got %s", func, type_of(t), type_of(v))
+
+#define ASSERT_ARGC(func, argc, n) \
+  ASSERT_FMT(argc == n, "%s expected %d arguments, but got %zu", func, n, argc)
+
 #else
 #define ASSERT(condition, message)
 #define ASSERT_FMT(condition, ...)
+#define ASSERT_TYPE(func, v, t)
+#define ASSERT_ARGC(func, argc, n)
 #endif
 
 #endif  // ERROR_H

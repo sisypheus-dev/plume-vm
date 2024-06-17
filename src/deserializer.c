@@ -122,6 +122,7 @@ Deserialized deserialize(GarbageCollector gc, FILE* file) {
   deserialized.natives = gc_calloc(&gc, libraries.num_libraries, sizeof(Native));
   deserialized.gc = gc;
   deserialized.call_function = call_function;
+  deserialized.call_threaded = call_threaded;
 
   return deserialized;
 }
